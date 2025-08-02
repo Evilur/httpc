@@ -71,7 +71,7 @@ void socket_handle_connection(const int server_fd) {
 
     /* Read the request line */
     char buffer[BUFFER_SIZE];
-    int request_size = read(client_fd, buffer, BUFFER_SIZE);
+    const int request_size = read(client_fd, buffer, BUFFER_SIZE);
 
     /* Get the end of the request line */
     char* const request_line_end = memchr(buffer, '\r', request_size);
@@ -81,10 +81,8 @@ void socket_handle_connection(const int server_fd) {
     printf("[%s] %s\n", inet_ntoa(client_address.sin_addr), buffer);
 
     /* Check the request line */
-    const http_method method =
-        strncmp(buffer, "GET /", 5) == 0 ? HTTP_METHOD_GET :
-        strncmp(buffer, "HEAD /", 6) == 0 ? HTTP_METHOD_HEAD :
-        HTTP_METHOD_NOT_IMPLEMENTED;
+    const http_method method = strncmp(buffer, "GET /", 5) == 0 ?
+        HTTP_METHOD_GET : HTTP_METHOD_NOT_IMPLEMENTED;
 
     /* Check for the right http method */
     if (method == HTTP_METHOD_NOT_IMPLEMENTED) {
@@ -92,8 +90,10 @@ void socket_handle_connection(const int server_fd) {
         goto end;
     }
 
-    /* Get the path */
-    const char* const path = "Makefile";
+    /* Get the path to the file from the request */
+    char* const path = buffer + 3;
+    *path = '.';
+    *strchr(path, ' ') = '\0';
 
     /* Check the file for existence */
     if (access(path, F_OK) == -1) {
@@ -116,6 +116,15 @@ void socket_handle_connection(const int server_fd) {
         http_return_file(client_fd, path, file_stat.st_size);
         goto end;
     }
+
+    /* If the file is a directory */
+    if (S_ISDIR(file_stat.st_mode)) {
+        http_return_directory(client_fd, path);
+        goto end;
+    }
+
+    /* If it is not a file or a directory */
+    http_return_error(client_fd, 501);
 
     /* Close the connection */
     end:
