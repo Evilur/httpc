@@ -1,0 +1,7 @@
+#ifndef HTTPC_PROPERTIES
+#define HTTPC_PROPERTIES
+
+#define DEFAULT_PORT 80
+#define BUFFER_SIZE 1024
+
+#endif

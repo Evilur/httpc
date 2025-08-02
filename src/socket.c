@@ -4,7 +4,7 @@
 #include "../properties.h"
 
 #include <stdio.h>
-#include <stdlib.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -88,7 +88,32 @@ void socket_handle_connection(const int server_fd) {
 
     /* Check for the right http method */
     if (method == HTTP_METHOD_NOT_IMPLEMENTED) {
-        http_send_error(client_fd, 501);
+        http_return_error(client_fd, 501);
+        goto end;
+    }
+
+    /* Get the path */
+    const char* const path = "Makefile";
+
+    /* Check the file for existence */
+    if (access(path, F_OK) == -1) {
+        http_return_error(client_fd, 404);
+        goto end;
+    }
+
+    /* Check for permissions */
+    if (access(path, R_OK) == -1) {
+        http_return_error(client_fd, 403);
+        goto end;
+    }
+
+    /* Get file stat */
+    struct stat file_stat;
+    stat(path, &file_stat);
+
+    /* If this is a regular file */
+    if (S_ISREG(file_stat.st_mode)) {
+        http_return_file(client_fd, path, file_stat.st_size);
         goto end;
     }
 

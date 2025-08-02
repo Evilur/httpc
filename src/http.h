@@ -1,6 +1,8 @@
 #ifndef HTTPC_HTTP
 #define HTTPC_HTTP
 
+#include <sys/stat.h>
+
 typedef char http_method;
 
 #define HTTP_METHOD_GET 0
@@ -13,6 +15,14 @@ typedef char http_method;
 "\r\n"
 #define HTTP_ERROR_RESPONSE_SIZE sizeof(HTTP_ERROR_RESPONSE) + 1
 
-void http_send_error(int client_fd, int e_code);
+#define HTTP_OK_RESPONSE\
+"HTTP/1.0 200 OK\r\n"\
+"Content-Length: %ld\r\n"\
+"\r\n"
+#define HTTP_OK_RESPONSE_SIZE sizeof(HTTP_OK_RESPONSE) + 24
+
+void http_return_error(int client_fd, int e_code);
+
+void http_return_file(int client_fd, const char* path, long file_size);
 
 #endif
