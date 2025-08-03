@@ -6,23 +6,23 @@ typedef char http_method;
 #define HTTP_METHOD_GET 0
 #define HTTP_METHOD_NOT_IMPLEMENTED -1
 
-#define HTTP_ERROR_RESPONSE\
+#define HTTP_ERROR_RESPONSE \
 "HTTP/1.0 %d\r\n"\
 "Content-Length: 0\r\n"\
 "\r\n"
 #define HTTP_ERROR_RESPONSE_SIZE sizeof(HTTP_ERROR_RESPONSE) + 1
 
-#define HTTP_OK_RESPONSE\
+#define HTTP_OK_RESPONSE \
 "HTTP/1.0 200 OK\r\n"\
 "Content-Length: %ld\r\n"\
 "\r\n"
 #define HTTP_OK_RESPONSE_SIZE sizeof(HTTP_OK_RESPONSE) + 24
 
-#define HTTP_OK_RESPONSE_BODY_HEAD\
-"<h1>Directory listing for /</h1>"\
+#define HTTP_OK_RESPONSE_BODY_HEAD \
+"<h1>Directory listing for %s</h1>"\
 "<hr>"\
-"<ul>"
-#define HTTP_OK_RESPONSE_BODY_HEAD_SIZE sizeof(HTTP_OK_RESPONSE_BODY_HEAD)
+"<ul>"\
+"<li><a href='../'>../</a></li>"
 
 void http_return_error(int client_fd, int e_code);
 

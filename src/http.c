@@ -1,5 +1,7 @@
 #include "http.h"
 
+#define _DEFAULT_SOURCE
+
 #include "../properties.h"
 
 #include <stdio.h>
@@ -22,7 +24,9 @@ void http_return_file(const int client_fd,
                       const long file_size) {
     /* Send headers */
     char headers_buffer[HTTP_OK_RESPONSE_SIZE];
-    const int header_size = sprintf(headers_buffer, HTTP_OK_RESPONSE, file_size);
+    const int header_size = sprintf(headers_buffer,
+                                    HTTP_OK_RESPONSE,
+                                    file_size);
     send(client_fd, headers_buffer, header_size, 0);
 
     /* Open the file for reading */
@@ -44,8 +48,7 @@ void http_return_directory(const int client_fd, const char* const path) {
     }
 
     /* Write the response body head */
-    strcpy(buffer, HTTP_OK_RESPONSE_BODY_HEAD);
-    long buffer_offset = HTTP_OK_RESPONSE_BODY_HEAD_SIZE;
+    long buffer_offset = sprintf(buffer, HTTP_OK_RESPONSE_BODY_HEAD, path + 1);
     long buffer_size = BUFFER_SIZE;
 
     /* Open the directory */
@@ -59,28 +62,46 @@ void http_return_directory(const int client_fd, const char* const path) {
     /* List the directory to the buffer */
     struct dirent* entry;
     while ((entry = readdir(dir)) != NULL) {
+        /* Get the entry name */
+        char* const entry_name = entry->d_name;
+
+        /* Skip the '.' and '..' */
+        if (strcmp(entry_name, ".") == 0
+            || strcmp(entry_name, "..") == 0) continue;
+
+        /* Format the entry name */
+        if (entry->d_type == DT_DIR) {
+            /* And a slash character */
+            const int old_len = strlen(entry_name);
+            entry_name[old_len] = '/';
+            entry_name[old_len + 1] = '\0';
+        }
+
         /* Try to write the data to the buffer */
         write_entry:
         const int available_size = buffer_size - buffer_offset;
         const int result = snprintf(buffer + buffer_offset,
                                     available_size,
-                                    "<li><a href='%s/%s'>%s</a></li>",
-                                    path + 2,
-                                    entry->d_name,
-                                    entry->d_name);
+                                    "<li><a href='%1$s'>%1$s</a></li>",
+                                    entry_name);
 
         /* If the buffer is full */
         if (result >= available_size) {
             /* Realloc the memory */
             buffer_size += BUFFER_SIZE;
             char* allocated = realloc(buffer, buffer_size);
-            if (allocated != NULL) buffer = allocated;
-            else goto end;
+            if (allocated == NULL) {
+                perror("Failed to memory reallocation");
+                closedir(dir);
+                free(buffer);
+                return;
+            } else buffer = allocated;
 
             /* Write the last entry again */
             goto write_entry;
         }
 
+        /* Increase the offset */
         buffer_offset += result;
     }
 
