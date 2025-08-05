@@ -47,34 +47,30 @@ void http_return_directory(const int client_fd, const char* const path) {
         return;
     }
 
-    /* Write the response body head */
+    /* Write the response body head to the buffer */
     long buffer_offset = sprintf(buffer, HTTP_OK_RESPONSE_BODY_HEAD, path + 1);
     long buffer_size = BUFFER_SIZE;
 
-    /* Open the directory */
-    DIR* const dir = opendir(path);
-    if (dir == NULL) {
-        perror("Cannot open a directory");
+    /* Get the list of files in the directory */
+    struct dirent** entry_list;
+    const int entry_number = scandir(path, &entry_list, NULL, alphasort);
+    if (entry_number == -1) {
+        perror("Failed to list the directory");
         free(buffer);
         return;
     }
 
     /* List the directory to the buffer */
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != NULL) {
-        /* Get the entry name */
+    for (int i = 0; i < entry_number; i++) {
+        /* Get the entry */
+        struct dirent* entry = entry_list[i];
         char* const entry_name = entry->d_name;
 
         /* Skip the '.' and '..' */
         if (strcmp(entry_name, ".") == 0
-            || strcmp(entry_name, "..") == 0) continue;
-
-        /* Format the entry name */
-        if (entry->d_type == DT_DIR) {
-            /* And a slash character */
-            const int old_len = strlen(entry_name);
-            entry_name[old_len] = '/';
-            entry_name[old_len + 1] = '\0';
+            || strcmp(entry_name, "..") == 0) {
+            free(entry);
+            continue;
         }
 
         /* Try to write the data to the buffer */
@@ -82,6 +78,8 @@ void http_return_directory(const int client_fd, const char* const path) {
         const int available_size = buffer_size - buffer_offset;
         const int result = snprintf(buffer + buffer_offset,
                                     available_size,
+                                    entry->d_type == DT_DIR ?
+                                    "<li><a href='%1$s/'>%1$s/</a></li>" :
                                     "<li><a href='%1$s'>%1$s</a></li>",
                                     entry_name);
 
@@ -92,10 +90,12 @@ void http_return_directory(const int client_fd, const char* const path) {
             char* allocated = realloc(buffer, buffer_size);
             if (allocated == NULL) {
                 perror("Failed to memory reallocation");
-                closedir(dir);
+                for (int j = i; j < entry_number; j++) free(entry_list[j]);
+                free(entry_list);
                 free(buffer);
                 return;
-            } else buffer = allocated;
+            }
+            buffer = allocated;
 
             /* Write the last entry again */
             goto write_entry;
@@ -103,6 +103,9 @@ void http_return_directory(const int client_fd, const char* const path) {
 
         /* Increase the offset */
         buffer_offset += result;
+
+        /* Free the memory */
+        free(entry);
     }
 
     /* Send the header */
@@ -115,7 +118,7 @@ void http_return_directory(const int client_fd, const char* const path) {
     /* Send the body */
     send(client_fd, buffer, buffer_offset, 0);
 
-    end:
-    closedir(dir);
+    /* Free the memory */
+    free(entry_list);
     free(buffer);
 }
