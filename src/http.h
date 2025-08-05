@@ -19,6 +19,7 @@ typedef char http_method;
 #define HTTP_OK_RESPONSE_SIZE sizeof(HTTP_OK_RESPONSE) + 24
 
 #define HTTP_OK_RESPONSE_BODY_HEAD \
+"<head><meta charset='UTF-8'></head>"\
 "<h1>Directory listing for %s</h1>"\
 "<hr>"\
 "<ul>"\
