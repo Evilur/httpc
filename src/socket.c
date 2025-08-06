@@ -1,7 +1,8 @@
+#include "../properties.h"
 #include "socket.h"
 #include "http.h"
-
-#include "../properties.h"
+#include "url.h"
+#include "string.h"
 
 #include <stdio.h>
 #include <sys/stat.h>
@@ -93,7 +94,17 @@ void socket_handle_connection(const int server_fd) {
     /* Get the path to the file from the request */
     char* const path = buffer + 3;
     *path = '.';
-    *strchr(path, ' ') = '\0';
+    char* const path_end = strchr(path, ' ');
+    if (path_end != NULL) *path_end = '\0';
+
+    /* Decode the url string */
+    url_decode(path);
+
+    /* Try to find '/../' in the path */
+    if (strstr(path, "/../") != NULL) {
+        http_return_error(client_fd, 403);
+        goto end;
+    }
 
     /* Check the file for existence */
     if (access(path, F_OK) == -1) {
