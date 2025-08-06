@@ -1,7 +1,5 @@
 #include "http.h"
 
-#define _DEFAULT_SOURCE
-
 #include "../properties.h"
 
 #include <stdio.h>
@@ -12,11 +10,12 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 void http_return_error(const int client_fd, const int e_code) {
     char buffer[HTTP_ERROR_RESPONSE_SIZE];
     sprintf(buffer, HTTP_ERROR_RESPONSE, e_code);
-    send(client_fd, buffer, HTTP_ERROR_RESPONSE_SIZE, 0);
+    write(client_fd, buffer, HTTP_ERROR_RESPONSE_SIZE);
 }
 
 void http_return_file(const int client_fd,
@@ -27,7 +26,7 @@ void http_return_file(const int client_fd,
     const int header_size = sprintf(headers_buffer,
                                     HTTP_OK_RESPONSE,
                                     file_size);
-    send(client_fd, headers_buffer, header_size, 0);
+    write(client_fd, headers_buffer, header_size);
 
     /* Open the file for reading */
     const int file_fd = open(path, O_RDONLY);
@@ -36,7 +35,7 @@ void http_return_file(const int client_fd,
     char buffer[BUFFER_SIZE];
     int read_size;
     while ((read_size = read(file_fd, buffer, BUFFER_SIZE)) > 0)
-        send(client_fd, buffer, read_size, 0);
+        write(client_fd, buffer, read_size);
 }
 
 void http_return_directory(const int client_fd, const char* const path) {
@@ -51,26 +50,39 @@ void http_return_directory(const int client_fd, const char* const path) {
     long buffer_offset = sprintf(buffer, HTTP_OK_RESPONSE_BODY_HEAD, path + 1);
     long buffer_size = BUFFER_SIZE;
 
-    /* Get the list of files in the directory */
-    struct dirent** entry_list;
-    const int entry_number = scandir(path, &entry_list, NULL, alphasort);
-    if (entry_number == -1) {
+    /* Open the directory for reading */
+    DIR* dir = opendir(path);
+    if (dir == NULL) {
         perror("Failed to list the directory");
         free(buffer);
         return;
     }
 
+    /* An array to store full entries path */
+    const int path_size = strlen(path);
+    char full_path[path_size + sizeof(((struct dirent*)NULL)->d_name)];
+    strcpy(full_path, path);
+
     /* List the directory to the buffer */
-    for (int i = 0; i < entry_number; i++) {
-        /* Get the entry */
-        struct dirent* entry = entry_list[i];
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        /* Get the entry name */
         char* const entry_name = entry->d_name;
 
         /* Skip the '.' and '..' */
         if (strcmp(entry_name, ".") == 0
             || strcmp(entry_name, "..") == 0) {
-            free(entry);
             continue;
+        }
+
+        /* Get stat for the entry */
+        strcpy(full_path + path_size, entry->d_name);
+        struct stat st;
+        if (stat(full_path, &st) == -1) {
+            perror("Failed to get file stat");
+            closedir(dir);
+            free(buffer);
+            return;
         }
 
         /* Try to write the data to the buffer */
@@ -78,7 +90,7 @@ void http_return_directory(const int client_fd, const char* const path) {
         const int available_size = buffer_size - buffer_offset;
         const int result = snprintf(buffer + buffer_offset,
                                     available_size,
-                                    entry->d_type == DT_DIR ?
+                                    S_ISDIR(st.st_mode) ?
                                     "<li><a href='%1$s/'>%1$s/</a></li>" :
                                     "<li><a href='%1$s'>%1$s</a></li>",
                                     entry_name);
@@ -90,8 +102,7 @@ void http_return_directory(const int client_fd, const char* const path) {
             char* allocated = realloc(buffer, buffer_size);
             if (allocated == NULL) {
                 perror("Failed to memory reallocation");
-                for (int j = i; j < entry_number; j++) free(entry_list[j]);
-                free(entry_list);
+                closedir(dir);
                 free(buffer);
                 return;
             }
@@ -103,9 +114,6 @@ void http_return_directory(const int client_fd, const char* const path) {
 
         /* Increase the offset */
         buffer_offset += result;
-
-        /* Free the memory */
-        free(entry);
     }
 
     /* Send the header */
@@ -113,12 +121,12 @@ void http_return_directory(const int client_fd, const char* const path) {
     const int header_size = sprintf(header_buffer,
                                     HTTP_OK_RESPONSE,
                                     buffer_offset);
-    send(client_fd, header_buffer, header_size, 0);
+    write(client_fd, header_buffer, header_size);
 
     /* Send the body */
-    send(client_fd, buffer, buffer_offset, 0);
+    write(client_fd, buffer, buffer_offset);
 
     /* Free the memory */
-    free(entry_list);
+    closedir(dir);
     free(buffer);
 }
