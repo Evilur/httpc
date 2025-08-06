@@ -1,10 +1,19 @@
+# Build type
+BUILD ?= Release
+
 # Compiler and its flags
-CC 	   ?= gcc
-CFLAGS ?= -Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wuninitialized \
--Wconversion -Wlogical-op -Wnull-dereference -Wduplicated-cond \
--Wredundant-decls -Wstrict-prototypes -Wmissing-declarations \
--Wunreachable-code -Wmissing-prototypes -O2
-CFLAGS += -std=c99
+CC ?= gcc
+ifeq ($(BUILD),Debug)
+	CFLAGS = -Werror\
+	-Wall -Wextra -Wpedantic -Wshadow -Wcast-align -Wformat=2 -Wconversion\
+	-Wsign-conversion -Wmissing-declarations -Wmissing-prototypes -Wlogical-op\
+	-Wold-style-definition -Wstrict-prototypes -Wundef -Wwrite-strings\
+	-Wswitch-enum -Wfloat-equal -Wpointer-arith -Winit-self -Wredundant-decls\
+	-Wnested-externs -Wlogical-op -Wduplicated-cond -Wduplicated-branches\
+	-Wstrict-aliasing=2 -Winline -Wstack-protector -Wstack-protector\
+	-Wstrict-overflow=5 -Wcast-qual -Wmissing-noreturn -Wjump-misses-init -g
+endif
+CFLAGS += -std=c99 -O2
 
 # Set the app name
 TARGET = httpc
