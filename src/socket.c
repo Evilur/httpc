@@ -82,11 +82,11 @@ void socket_handle_connection(const int server_fd) {
     printf("[%s] %s\n", inet_ntoa(client_address.sin_addr), buffer);
 
     /* Check the request line */
-    const http_method method = strncmp(buffer, "GET /", 5) == 0 ?
-        HTTP_METHOD_GET : HTTP_METHOD_NOT_IMPLEMENTED;
+    const enum HTTP_METHOD method = strncmp(buffer, "GET /", 5) == 0 ?
+        GET : NOT_IMPLEMENTED;
 
     /* Check for the right http method */
-    if (method == HTTP_METHOD_NOT_IMPLEMENTED) {
+    if (method == NOT_IMPLEMENTED) {
         http_return_error(client_fd, 501);
         goto end;
     }

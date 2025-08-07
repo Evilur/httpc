@@ -1,16 +1,10 @@
 #ifndef HTTPC_HTTP
 #define HTTPC_HTTP
 
-typedef char http_method;
-
-#define HTTP_METHOD_GET 0
-#define HTTP_METHOD_NOT_IMPLEMENTED -1
-
-#define HTTP_ERROR_RESPONSE \
-"HTTP/1.0 %d\r\n"\
-"Content-Length: 0\r\n"\
-"\r\n"
-#define HTTP_ERROR_RESPONSE_SIZE sizeof(HTTP_ERROR_RESPONSE) + 1
+enum HTTP_METHOD {
+    GET,
+    NOT_IMPLEMENTED
+};
 
 #define HTTP_OK_RESPONSE \
 "HTTP/1.0 200 OK\r\n"\
