@@ -1,6 +1,6 @@
-#include "http.h"
-
 #include "../properties.h"
+#include "http.h"
+#include "mime.h"
 
 #include <stdio.h>
 #include <sys/socket.h>
@@ -24,7 +24,6 @@ void http_return_error(const int client_fd, const int e_code) {
         buffer,
         "HTTP/1.1 %d\r\n"
         "Content-Length: 0\r\n"
-        "Connection: close\r\n"
         "\r\n",
         e_code
     );
@@ -39,9 +38,14 @@ void http_return_file(const int client_fd,
     const int header_size = sprintf(
         buffer,
         "HTTP/1.1 200 OK\r\n"
+#if GET_MIME_TYPE
+        "Content-Type: %s\r\n"
+#endif
         "Content-Length: %ld\r\n"
-        "Connection: close\r\n"
         "\r\n",
+#if GET_MIME_TYPE
+        mime_get_type(strrchr(path, '.') + 1),
+#endif
         file_size
     );
 

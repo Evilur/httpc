@@ -4,4 +4,6 @@
 #define DEFAULT_PORT 80
 #define BUFFER_SIZE 1024
 
+#define GET_MIME_TYPE 1
+
 #endif
