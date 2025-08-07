@@ -12,121 +12,194 @@
 #include <string.h>
 #include <sys/stat.h>
 
+static int string_compare(const void* str1, const void* str2);
+
+static void write_chunk(int client_fd,
+                        const char* data,
+                        unsigned int data_size);
+
 void http_return_error(const int client_fd, const int e_code) {
-    char buffer[HTTP_ERROR_RESPONSE_SIZE];
-    sprintf(buffer, HTTP_ERROR_RESPONSE, e_code);
-    write(client_fd, buffer, HTTP_ERROR_RESPONSE_SIZE);
+    char buffer[BUFFER_SIZE];
+    const int response_size = sprintf(
+        buffer,
+        "HTTP/1.1 %d\r\n"
+        "Content-Length: 0\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        e_code
+    );
+    write(client_fd, buffer, response_size);
 }
 
 void http_return_file(const int client_fd,
                       const char* path,
                       const long file_size) {
+    /* Init the buffer to store the data */
+    char buffer[BUFFER_SIZE];
+    const int header_size = sprintf(
+        buffer,
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Length: %ld\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        file_size
+    );
+
     /* Send headers */
-    char headers_buffer[HTTP_OK_RESPONSE_SIZE];
-    const int header_size = sprintf(headers_buffer,
-                                    HTTP_OK_RESPONSE,
-                                    file_size);
-    write(client_fd, headers_buffer, header_size);
+    write(client_fd, buffer, header_size);
 
     /* Open the file for reading */
     const int file_fd = open(path, O_RDONLY);
+    if (file_fd == -1) {
+        perror("Failed to read the file");
+        return;
+    }
 
     /* Read the data to the buffer and send it to the socket */
-    char buffer[BUFFER_SIZE];
     int read_size;
     while ((read_size = read(file_fd, buffer, BUFFER_SIZE)) > 0)
         write(client_fd, buffer, read_size);
 }
 
 void http_return_directory(const int client_fd, const char* const path) {
-    /* Buffer for store the http response */
-    char* buffer = malloc(BUFFER_SIZE);
-    if (buffer == NULL) {
-        perror("Failed to memory allocation");
-        return;
-    }
-
-    /* Write the response body head to the buffer */
-    long buffer_offset = sprintf(buffer, HTTP_OK_RESPONSE_BODY_HEAD, path + 1);
-    long buffer_size = BUFFER_SIZE;
-
     /* Open the directory for reading */
     DIR* dir = opendir(path);
     if (dir == NULL) {
         perror("Failed to list the directory");
-        free(buffer);
         return;
     }
 
-    /* An array to store full entries path */
-    const int path_size = strlen(path);
-    char full_path[path_size + sizeof(((struct dirent*)NULL)->d_name)];
-    strcpy(full_path, path);
+    /* Get the number of entries in the directory */
+    unsigned int entry_number = 0;
+    while (readdir(dir) != NULL) entry_number++;
+    closedir(dir);
 
-    /* List the directory to the buffer */
+    /* Open the directory for reading again */
+    dir = opendir(path);
+    if (dir == NULL) {
+        perror("Failed to list the directory");
+        return;
+    }
+
+    /* Get all entries (exclude '.' and '..') */
+    entry_number -= 2;
+#define ENTRY_NAME_SIZE sizeof(((struct dirent*)NULL)->d_name)
+    const char entry_names[entry_number][ENTRY_NAME_SIZE];
     struct dirent* entry;
-    while ((entry = readdir(dir)) != NULL) {
+    for (unsigned int i = 0; (entry = readdir(dir)) != NULL;) {
         /* Get the entry name */
-        char* const entry_name = entry->d_name;
+        const char* const entry_name = entry->d_name;
 
-        /* Skip the '.' and '..' */
-        if (strcmp(entry_name, ".") == 0
-            || strcmp(entry_name, "..") == 0) {
+        /* Skip '.' and '..' */
+        if (strcmp(entry_name, ".") == 0 || strcmp(entry_name, "..") == 0)
             continue;
-        }
+
+        /* Copy the entry name to the array */
+        strcpy(entry_names[i], entry_name);
+
+        /* Increment the iterator if all is OK */
+        i++;
+    }
+    closedir(dir);
+
+    /* Sort the array of entry names */
+    qsort(entry_names, entry_number, ENTRY_NAME_SIZE, string_compare);
+
+    /* Buffer to store and send the data */
+    char buffer[BUFFER_SIZE];
+    unsigned int buffer_offset = 0;
+
+    /* Get the path size */
+    unsigned long path_size = strlen(path);
+
+    /* Send the beginning of the response  */
+    const int response_beg_size = sprintf(
+        buffer,
+        "HTTP/1.1 200 OK\r\n"
+        "Transfer-Encoding: chunked\r\n"
+        "Content-Type: text/html; charset=UTF-8\r\n"
+        "\r\n"
+        "%lx\r\n"
+        "<h1>Directory listing for %s</h1>"
+        "<hr>"
+        "<ul>"
+        "<li><a href='../'>../</a></li>",
+        path_size - 1 + 69,
+        path + 1
+    );
+    write(client_fd, buffer, response_beg_size);
+
+    /* An array to store the entry path */
+    char entry_path[path_size + ENTRY_NAME_SIZE];
+    strcpy(entry_path, path);
+    if (entry_path[path_size - 1] != '/') entry_path[path_size++] = '/';
+
+    /* Send all directory entries to the client */
+    for (unsigned int i = 0; i < entry_number;) {
+        const char* entry_name = entry_names[i];
 
         /* Get stat for the entry */
-        strcpy(full_path + path_size, entry->d_name);
+        strcpy(entry_path + path_size, entry_name);
         struct stat st;
-        if (stat(full_path, &st) == -1) {
+        if (stat(entry_path, &st) == -1) {
             perror("Failed to get file stat");
-            closedir(dir);
-            free(buffer);
             return;
         }
 
         /* Try to write the data to the buffer */
-        write_entry:
-        const int available_size = buffer_size - buffer_offset;
-        const int result = snprintf(buffer + buffer_offset,
-                                    available_size,
-                                    S_ISDIR(st.st_mode) ?
-                                    "<li><a href='%1$s/'>%1$s/</a></li>" :
-                                    "<li><a href='%1$s'>%1$s</a></li>",
-                                    entry_name);
+        const int available_size = BUFFER_SIZE - buffer_offset;
+        const int result_size = snprintf(
+            buffer + buffer_offset,
+            available_size,
+            S_ISDIR(st.st_mode) ? "<li><a href='%1$s/'>%1$s/</a></li>"
+                                : "<li><a href='%1$s'>%1$s</a></li>",
+            entry_name
+        );
 
         /* If the buffer is full */
-        if (result >= available_size) {
-            /* Realloc the memory */
-            buffer_size += BUFFER_SIZE;
-            char* allocated = realloc(buffer, buffer_size);
-            if (allocated == NULL) {
-                perror("Failed to memory reallocation");
-                closedir(dir);
-                free(buffer);
-                return;
-            }
-            buffer = allocated;
+        if (result_size >= available_size) {
+            /* Send the chunk to the client */
+            write_chunk(client_fd, buffer, buffer_offset);
 
-            /* Write the last entry again */
-            goto write_entry;
+            /* Repeat this iteration */
+            continue;
         }
 
-        /* Increase the offset */
-        buffer_offset += result;
+        /* Increment the buffer offset */
+        buffer_offset += result_size;
+
+        /* Increment the iterator if all is OK */
+        i++;
     }
 
-    /* Send the header */
-    char header_buffer[HTTP_OK_RESPONSE_SIZE];
-    const int header_size = sprintf(header_buffer,
-                                    HTTP_OK_RESPONSE,
-                                    buffer_offset);
-    write(client_fd, header_buffer, header_size);
+    /* Drain the buffer */
+    if (buffer_offset != 0) write_chunk(client_fd, buffer, buffer_offset);
 
-    /* Send the body */
-    write(client_fd, buffer, buffer_offset);
+    /* Send the close chunk */
+    write(client_fd,
+          "\r\n"
+          "5\r\n"
+          "</ul>\r\n"
+          "0\r\n"
+          "\r\n",
+          17);
+}
 
-    /* Free the memory */
-    closedir(dir);
-    free(buffer);
+static int string_compare(const void* str1, const void* str2) {
+    return strcmp(str1, str2);
+}
+
+static void write_chunk(const int client_fd,
+                        const char* const data,
+                        const unsigned int data_size) {
+    /* Buffer to store the chunk size */
+    char size_buffer[sizeof("\r\n00000000\r\n")];
+
+    /* Convert integer into the hex string
+     * and write it to the buffer (right after '\r\n') */
+    const int size_buffer_size = sprintf(size_buffer, "\r\n%x\r\n", data_size);
+
+    /* Send this buffer and data to the client */
+    write(client_fd, size_buffer, size_buffer_size);
+    write(client_fd, data, data_size);
 }
