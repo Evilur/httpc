@@ -142,8 +142,10 @@ void http_return_directory(const int client_fd, const char* const path) {
         strcpy(entry_path + path_size, entry_name);
         struct stat st;
         if (stat(entry_path, &st) == -1) {
+            fprintf(stderr, "%s: ", entry_path + 2);
             perror("Failed to get file stat");
-            return;
+            i++;
+            continue;
         }
 
         /* Try to write the data to the buffer */
