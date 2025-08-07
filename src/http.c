@@ -161,6 +161,9 @@ void http_return_directory(const int client_fd, const char* const path) {
             /* Send the chunk to the client */
             write_chunk(client_fd, buffer, buffer_offset);
 
+            /* Reset the buffer offset */
+            buffer_offset = 0;
+
             /* Repeat this iteration */
             continue;
         }
