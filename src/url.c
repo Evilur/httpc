@@ -1,11 +1,6 @@
 #include "url.h"
 
-int url_hex_to_int(const char hex) {
-    if (hex >= '0' && hex <= '9') return hex - '0';
-    if (hex >= 'A' && hex <= 'F') return hex - 'A' + 10;
-    if (hex >= 'a' && hex <= 'f') return hex - 'a' + 10;
-    return -1;
-}
+static int url_hex_to_int(char hex);
 
 int url_decode(char* encoded) {
     /* Check the input */
@@ -44,4 +39,11 @@ int url_decode(char* encoded) {
 
     /* Return the success code */
     return 0;
+}
+
+static int url_hex_to_int(const char hex) {
+    if (hex >= '0' && hex <= '9') return hex - '0';
+    if (hex >= 'A' && hex <= 'F') return hex - 'A' + 10;
+    if (hex >= 'a' && hex <= 'f') return hex - 'a' + 10;
+    return -1;
 }
