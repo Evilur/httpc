@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 
 int main(const int argc, const char* const* const argv) {
     /* Get the port to listen to */
