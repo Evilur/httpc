@@ -12,8 +12,19 @@
 #include <string.h>
 #include <sys/stat.h>
 
+/**
+ * A wrapper for the strcmp() function
+ * @note { Only for usage in the qsort() function }
+ * @warning { Use strcmp() instead }
+ */
 static int string_compare(const void* str1, const void* str2);
 
+/**
+ * Write the http chunk to the socket
+ * @param client_fd Client file descriptor
+ * @param data A chunk buffer
+ * @param data_size A Size of the chunk buffer
+ */
 static void write_chunk(int client_fd,
                         const char* data,
                         unsigned int data_size);
@@ -22,7 +33,7 @@ void http_return_error(const int client_fd, const int e_code) {
     char buffer[BUFFER_SIZE];
     const int response_size = sprintf(
         buffer,
-        "HTTP/1.1 %d\r\n"
+        "HTTP/1.1 %d ERROR\r\n"
         "Content-Length: 0\r\n"
         "\r\n",
         e_code
