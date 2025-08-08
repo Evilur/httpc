@@ -4,7 +4,7 @@ BUILD ?= Release
 # Compiler and its flags
 CC ?= gcc
 ifeq ($(BUILD),Debug)
-	CFLAGS = -Werror -g3 -O0\
+	CFLAGS = -Werror -g3 -O0 -std=c99\
 	-Wall -Wextra -Wpedantic -Wshadow -Wcast-align -Wformat=2 -Wconversion\
 	-Wsign-conversion -Wmissing-declarations -Wmissing-prototypes -Wlogical-op\
 	-Wold-style-definition -Wstrict-prototypes -Wundef -Wwrite-strings\
