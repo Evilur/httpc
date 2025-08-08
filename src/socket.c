@@ -6,13 +6,9 @@
 
 #include <stdio.h>
 #include <sys/stat.h>
-#include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
-#include <arpa/inet.h>
-
-static void end_response(int client_fd);
 
 int socket_listen_port(const unsigned short port) {
     /* Create a socket */
@@ -58,15 +54,8 @@ int socket_listen_port(const unsigned short port) {
     return server_fd;
 }
 
-void socket_handle_connection(const int server_fd) {
-    /* Init a struct to store the client address */
-    struct sockaddr_in client_address;
-    int client_addrlen = sizeof(client_address);
-
-    /* Accept the connection */
-    const int client_fd = accept(server_fd,
-                                 (struct sockaddr*)&client_address,
-                                 (socklen_t*)&client_addrlen);
+void socket_handle_connection(const int client_fd, const char* ip_address) {
+    /* Check the descriptor */
     if (client_fd == -1) {
         perror("Failed to accept the connection\n");
         return;
@@ -83,7 +72,7 @@ void socket_handle_connection(const int server_fd) {
     if (request_line_end != NULL) *request_line_end = '\0';
 
     /* Log the message */
-    printf("[%s] %s\n", inet_ntoa(client_address.sin_addr), buffer);
+    printf("[%s] %s\n", ip_address, buffer);
 
     /* Check the request line */
     const enum HTTP_METHOD method = strncmp(buffer, "GET /", 5) == 0 ?
@@ -92,7 +81,6 @@ void socket_handle_connection(const int server_fd) {
     /* Check for the right http method */
     if (method == NOT_IMPLEMENTED) {
         http_return_error(client_fd, 501);
-        end_response(client_fd);
         return;
     }
 
@@ -108,21 +96,18 @@ void socket_handle_connection(const int server_fd) {
     /* Try to find '/../' in the path */
     if (strstr(path, "/../") != NULL) {
         http_return_error(client_fd, 403);
-        end_response(client_fd);
         return;
     }
 
     /* Check the file for existence */
     if (access(path, F_OK) == -1) {
         http_return_error(client_fd, 404);
-        end_response(client_fd);
         return;
     }
 
     /* Check for permissions */
     if (access(path, R_OK) == -1) {
         http_return_error(client_fd, 403);
-        end_response(client_fd);
         return;
     }
 
@@ -133,22 +118,15 @@ void socket_handle_connection(const int server_fd) {
     /* If this is a regular file */
     if (S_ISREG(file_stat.st_mode)) {
         http_return_file(client_fd, path, file_stat.st_size);
-        end_response(client_fd);
         return;
     }
 
     /* If the file is a directory */
     if (S_ISDIR(file_stat.st_mode)) {
         http_return_directory(client_fd, path);
-        end_response(client_fd);
         return;
     }
 
     /* If it is not a file or a directory */
     http_return_error(client_fd, 501);
-    end_response(client_fd);
-}
-
-static void end_response(const int client_fd) {
-    close(client_fd);
 }
