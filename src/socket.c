@@ -12,6 +12,8 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
+static void end_response(int client_fd);
+
 int socket_listen_port(const unsigned short port) {
     /* Create a socket */
     const int server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -26,18 +28,18 @@ int socket_listen_port(const unsigned short port) {
                    &socket_opt, sizeof(socket_opt)) == -1) {
         perror("Failed to set socket options");
         return -1;
-    }
+                   }
 
     /* Init in address */
     const struct sockaddr_in server_address = {
-        AF_INET,
-        htons(port),
-        { INADDR_ANY }
+        .sin_family = AF_INET,
+        .sin_port = htons(port),
+        .sin_addr = { INADDR_ANY }
     };
 
     /* Bind the socket to the address */
     if (bind(server_fd,
-        (struct sockaddr*)&server_address,
+        (const struct sockaddr*)&server_address,
         sizeof(server_address)) == -1) {
         perror("Failed to bind the socket to the address");
         return -1;
@@ -50,7 +52,7 @@ int socket_listen_port(const unsigned short port) {
     }
 
     /* Log */
-    printf("Start listening to %hu port (http://localhost:%hu)\n", port, port);
+    printf("Start listening to %hu port (http://0.0.0.0:%hu)\n", port, port);
 
     /* Return the server file descriptor */
     return server_fd;
@@ -59,7 +61,7 @@ int socket_listen_port(const unsigned short port) {
 void socket_handle_connection(const int server_fd) {
     /* Init a struct to store the client address */
     struct sockaddr_in client_address;
-    const int client_addrlen = sizeof(client_address);
+    int client_addrlen = sizeof(client_address);
 
     /* Accept the connection */
     const int client_fd = accept(server_fd,
@@ -72,10 +74,12 @@ void socket_handle_connection(const int server_fd) {
 
     /* Read the request line */
     char buffer[BUFFER_SIZE];
-    const int request_size = read(client_fd, buffer, BUFFER_SIZE);
+    const long request_size = read(client_fd, buffer, BUFFER_SIZE);
 
     /* Get the end of the request line */
-    char* const request_line_end = memchr(buffer, '\r', request_size);
+    char* const request_line_end = memchr(buffer,
+                                          '\r',
+                                          (unsigned long)request_size);
     if (request_line_end != NULL) *request_line_end = '\0';
 
     /* Log the message */
@@ -88,7 +92,8 @@ void socket_handle_connection(const int server_fd) {
     /* Check for the right http method */
     if (method == NOT_IMPLEMENTED) {
         http_return_error(client_fd, 501);
-        goto end;
+        end_response(client_fd);
+        return;
     }
 
     /* Get the path to the file from the request */
@@ -103,19 +108,22 @@ void socket_handle_connection(const int server_fd) {
     /* Try to find '/../' in the path */
     if (strstr(path, "/../") != NULL) {
         http_return_error(client_fd, 403);
-        goto end;
+        end_response(client_fd);
+        return;
     }
 
     /* Check the file for existence */
     if (access(path, F_OK) == -1) {
         http_return_error(client_fd, 404);
-        goto end;
+        end_response(client_fd);
+        return;
     }
 
     /* Check for permissions */
     if (access(path, R_OK) == -1) {
         http_return_error(client_fd, 403);
-        goto end;
+        end_response(client_fd);
+        return;
     }
 
     /* Get file stat */
@@ -125,19 +133,22 @@ void socket_handle_connection(const int server_fd) {
     /* If this is a regular file */
     if (S_ISREG(file_stat.st_mode)) {
         http_return_file(client_fd, path, file_stat.st_size);
-        goto end;
+        end_response(client_fd);
+        return;
     }
 
     /* If the file is a directory */
     if (S_ISDIR(file_stat.st_mode)) {
         http_return_directory(client_fd, path);
-        goto end;
+        end_response(client_fd);
+        return;
     }
 
     /* If it is not a file or a directory */
     http_return_error(client_fd, 501);
+    end_response(client_fd);
+}
 
-    /* Close the connection */
-    end:
+static void end_response(const int client_fd) {
     close(client_fd);
 }

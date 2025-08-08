@@ -36,12 +36,12 @@ all: $(BINDIR)/$(TARGET)
 
 # Link the target
 $(BINDIR)/$(TARGET): $(OBJS)
-	mkdir -p $(BINDIR)
+	@mkdir -p $(BINDIR)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
 # Compile all source files to object files
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
-	mkdir -p $(OBJDIR)
+	@mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Clean all compiled C binaries

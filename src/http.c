@@ -27,7 +27,7 @@ void http_return_error(const int client_fd, const int e_code) {
         "\r\n",
         e_code
     );
-    write(client_fd, buffer, response_size);
+    write(client_fd, buffer, (unsigned long)response_size);
 }
 
 void http_return_file(const int client_fd,
@@ -50,7 +50,7 @@ void http_return_file(const int client_fd,
     );
 
     /* Send headers */
-    write(client_fd, buffer, header_size);
+    write(client_fd, buffer, (unsigned long)header_size);
 
     /* Open the file for reading */
     const int file_fd = open(path, O_RDONLY);
@@ -60,11 +60,17 @@ void http_return_file(const int client_fd,
     }
 
     /* Read the data to the buffer and send it to the socket */
-    int read_size;
+    long read_size;
     while ((read_size = read(file_fd, buffer, BUFFER_SIZE)) > 0)
-        write(client_fd, buffer, read_size);
+        if (read_size != -1) write(client_fd, buffer, (unsigned long)read_size);
+        else {
+            perror("Failed to read the file");
+            return;
+        }
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstack-protector"
 void http_return_directory(const int client_fd, const char* const path) {
     /* Open the directory for reading */
     DIR* dir = opendir(path);
@@ -88,7 +94,7 @@ void http_return_directory(const int client_fd, const char* const path) {
     /* Get all entries (exclude '.' and '..') */
     entry_number -= 2;
 #define ENTRY_NAME_SIZE sizeof(((struct dirent*)NULL)->d_name)
-    const char entry_names[entry_number][ENTRY_NAME_SIZE];
+    char entry_names[entry_number][ENTRY_NAME_SIZE];
     struct dirent* entry;
     for (unsigned int i = 0; (entry = readdir(dir)) != NULL;) {
         /* Get the entry name */
@@ -131,7 +137,7 @@ void http_return_directory(const int client_fd, const char* const path) {
         path_size - 1 + 69,
         path + 1
     );
-    write(client_fd, buffer, response_beg_size);
+    write(client_fd, buffer, (unsigned long)response_beg_size);
 
     /* An array to store the entry path */
     char entry_path[path_size + ENTRY_NAME_SIZE];
@@ -153,12 +159,13 @@ void http_return_directory(const int client_fd, const char* const path) {
         }
 
         /* Try to write the data to the buffer */
-        const int available_size = BUFFER_SIZE - buffer_offset;
-        const int result_size = snprintf(
+        const unsigned int available_size = BUFFER_SIZE - buffer_offset;
+        const unsigned int result_size = (unsigned int)snprintf(
             buffer + buffer_offset,
             available_size,
-            S_ISDIR(st.st_mode) ? "<li><a href='%1$s/'>%1$s/</a></li>"
-                                : "<li><a href='%1$s'>%1$s</a></li>",
+            S_ISDIR(st.st_mode) ? "<li><a href='%s/'>%s/</a></li>"
+                                : "<li><a href='%s'>%s</a></li>",
+            entry_name,
             entry_name
         );
 
@@ -193,6 +200,7 @@ void http_return_directory(const int client_fd, const char* const path) {
           "\r\n",
           17);
 }
+#pragma GCC diagnostic pop
 
 static int string_compare(const void* str1, const void* str2) {
     return strcmp(str1, str2);
@@ -209,6 +217,6 @@ static void write_chunk(const int client_fd,
     const int size_buffer_size = sprintf(size_buffer, "\r\n%x\r\n", data_size);
 
     /* Send this buffer and data to the client */
-    write(client_fd, size_buffer, size_buffer_size);
+    write(client_fd, size_buffer, (unsigned long)size_buffer_size);
     write(client_fd, data, data_size);
 }
