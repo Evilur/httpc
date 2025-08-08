@@ -194,11 +194,9 @@ void http_return_directory(const int client_fd, const char* const path) {
     /* Send the close chunk */
     write(client_fd,
           "\r\n"
-          "5\r\n"
-          "</ul>\r\n"
           "0\r\n"
           "\r\n",
-          17);
+          7);
 }
 #pragma GCC diagnostic pop
 
