@@ -1,6 +1,7 @@
 #include "../properties.h"
 #include "socket.h"
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -29,6 +30,9 @@ int main(const int argc, const char* const* const argv) {
                                      (socklen_t*)&client_addrlen);
 
 #if NON_BLOCKING
+        /* Ignore SIGCHLD to avoid zombie children */
+        signal(SIGCHLD, SIG_IGN);
+
         /* Fork the process */
         const int pid = fork();
 
@@ -58,7 +62,7 @@ int main(const int argc, const char* const* const argv) {
         socket_handle_connection(client_fd, inet_ntoa(client_address.sin_addr));
 #endif
 
-        /* If it is a parent process (or doesn't fork),
+        /* If it is a parent process (or hasn't been forked),
          * close the client descriptor */
         close(client_fd);
     }
