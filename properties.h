@@ -3,6 +3,7 @@
 
 #define DEFAULT_PORT 80
 #define BUFFER_SIZE 1024
+#define TIMEOUT_SECONDS 5
 
 #define GET_MIME_TYPE 0
 #define NON_BLOCKING 1

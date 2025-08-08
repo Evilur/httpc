@@ -57,13 +57,17 @@ int socket_listen_port(const unsigned short port) {
 void socket_handle_connection(const int client_fd, const char* ip_address) {
     /* Check the descriptor */
     if (client_fd == -1) {
-        perror("Failed to accept the connection\n");
+        perror("Failed to accept the connection");
         return;
     }
 
     /* Read the request line */
     char buffer[BUFFER_SIZE];
     const long request_size = read(client_fd, buffer, BUFFER_SIZE);
+    if (request_size == -1) {
+        perror("Failed to receive the data");
+        return;
+    }
 
     /* Get the end of the request line */
     char* const request_line_end = memchr(buffer,

@@ -29,6 +29,14 @@ int main(const int argc, const char* const* const argv) {
                                      (struct sockaddr*)&client_address,
                                      (socklen_t*)&client_addrlen);
 
+        /* Set the timeout */
+        struct timeval timeout = { .tv_sec = TIMEOUT_SECONDS };
+        if (setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO,
+                       &timeout, sizeof(timeout)) == -1) {
+            perror("Failed to set the timeout");
+            return -1;
+       }
+
 #if NON_BLOCKING
         /* Ignore SIGCHLD to avoid zombie children */
         signal(SIGCHLD, SIG_IGN);
@@ -39,7 +47,7 @@ int main(const int argc, const char* const* const argv) {
         /* If it is impossible to fork the program */
         if (pid == -1) {
             perror("Failed to fork the process");
-            return 0;
+            return -1;
         }
 
         /* If it is a child */
