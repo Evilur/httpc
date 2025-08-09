@@ -68,7 +68,7 @@ ifeq ($(DEST),)
 endif
 	# Create DEBIAN directory
 	mkdir -p $(PACKAGEDIR)/DEBIAN
-	echo -en "\
+	printf "\
 	Package: $(TARGET)\n\
 	Version: $(VERSION)\n\
 	Architecture: $(ARCH)\n\
