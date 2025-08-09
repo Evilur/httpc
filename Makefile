@@ -19,7 +19,7 @@ else
 endif
 
 # Set the app name and version
-TARGET ?= httpc
+TARGET  = httpc
 VERSION = 1.0.0
 
 # Set source and object directories
