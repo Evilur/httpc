@@ -12,15 +12,14 @@ jobs:
 
             - name: Make
               run: make all deb PREFIX=/usr \
-                   ARCH=amd64 DEST=linux CC=gcc \
-                   TARGET=httpc_linux_amd64
+                   ARCH=amd64 DEST=linux CC=gcc
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
                   name: httpc_linux_amd64
                   path: |
-                    bin/httpc_linux_amd64
+                    bin/httpc
                     deb/httpc_linux_amd64.deb
                   overwrite: true
                   compression-level: 9
@@ -44,14 +43,13 @@ jobs:
               run: make all deb PREFIX=/data/data/com.termux/files/usr \
                    ARCH=${{ matrix.arch }} DEST=termux \
                    CC=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.arch }}-linux-android*35-clang \
-                   TARGET=httpc_termux_${{ matrix.arch }}
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
                   name: httpc_termux_${{ matrix.arch }}
                   path: |
-                      bin/httpc_termux_${{ matrix.arch }}
+                      bin/httpc
                       deb/httpc_termux_${{ matrix.arch }}.deb
                   overwrite: true
                   compression-level: 9
