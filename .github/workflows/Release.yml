@@ -4,17 +4,54 @@ on:
         tags:
             - '*'
 jobs:
-    build:
+    linux-amd64-build:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
               uses: actions/checkout@v4
 
             - name: Make
-              run: make
+              run: make all deb PREFIX=/usr \
+                   ARCH=amd64 DEST=linux CC=gcc \
+                   TARGET=httpc_linux_amd64
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: binaries
-                  path: bin
+                  name: httpc_linux_amd64
+                  path: |
+                    bin/httpc_linux_amd64
+                    deb/httpc_linux_amd64.deb
+                  overwrite: true
+                  compression-level: 9
+    termux-build:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                arch: [aarch64, armv7a, x86_64]
+        env:
+            ANDROID_NDK: "android-ndk-r28c"
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Install Android NDK
+              run: |
+                wget dl.google.com/android/repository/$ANDROID_NDK-linux.zip
+                unzip $ANDROID_NDK-linux.zip
+
+            - name: Make
+              run: make all deb PREFIX=/data/data/com.termux/files/usr \
+                   ARCH=${{ matrix.arch }} DEST=termux \
+                   CC=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.arch }}-linux-android*35-clang \
+                   TARGET=httpc_termux_${{ matrix.arch }}
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: httpc_termux_${{ matrix.arch }}
+                  path: |
+                      bin/httpc_termux_${{ matrix.arch }}
+                      deb/httpc_termux_${{ matrix.arch }}.deb
+                  overwrite: true
+                  compression-level: 9
