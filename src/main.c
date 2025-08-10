@@ -19,6 +19,11 @@ int main(const int argc, const char* const* const argv) {
     const int server_fd = socket_listen_port(port);
     if (server_fd == -1) return -1;
 
+#if NON_BLOCKING
+    /* Ignore SIGCHLD to avoid zombie children */
+    signal(SIGCHLD, SIG_IGN);
+#endif
+
     /* Handle all connections */
     for (;;) {
         /* Init a struct to store the client address */
@@ -30,6 +35,12 @@ int main(const int argc, const char* const* const argv) {
                                      (struct sockaddr*)&client_address,
                                      (socklen_t*)&client_addrlen);
 
+        /* Check the descriptor */
+        if (client_fd == -1) {
+            perror("Failed to accept the connection");
+            return -1;
+        }
+
         /* Set the timeout */
         struct timeval timeout = { .tv_sec = TIMEOUT_SECONDS };
         if (setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO,
@@ -39,9 +50,6 @@ int main(const int argc, const char* const* const argv) {
        }
 
 #if NON_BLOCKING
-        /* Ignore SIGCHLD to avoid zombie children */
-        signal(SIGCHLD, SIG_IGN);
-
         /* Fork the process */
         const int pid = fork();
 
