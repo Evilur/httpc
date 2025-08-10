@@ -73,8 +73,8 @@ endif
 	Version: $(VERSION)\n\
 	Architecture: $(ARCH)\n\
 	Maintainer: Andrew Shershunov (Evilur) <the.evilur@gmail.com>\n\
-	Description: Simple http server on C\n\
-	 Zero-conf http 1.1 server to use instead of python -m http.server.\n\
+	Description: Simple zero-conf http server on C\n\
+	 A Simple zero-conf http 1.1 server to use instead of the python http.server.\n\
 	 Distributed as a binary or a source code for running on any platform \n\
 	 where other servers cannot be run\n\
 	Section: net\n\
