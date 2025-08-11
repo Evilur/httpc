@@ -1,9 +1,8 @@
 <div align=center style='text-align: center'>
-    <img src='https://img.shields.io/github/repo-size/Evilur/httpc?style=for-the-badge'/>
-    <img src='https://img.shields.io/github/v/release/Evilur/httpc?style=for-the-badge'/>
-    <br>
-    <img src='https://img.shields.io/github/license/Evilur/httpc?color=%230CD94E&style=for-the-badge'/>
-    <img src='https://img.shields.io/github/last-commit/Evilur/httpc?color=%230CD94E&style=for-the-badge'/>
+    <img src='https://img.shields.io/github/repo-size/Evilur/httpc?color=%230077ff&style=for-the-badge'/>
+    <img src='https://img.shields.io/github/v/release/Evilur/httpc?color=%230077ff&style=for-the-badge'/>
+    <img src='https://img.shields.io/github/license/Evilur/httpc?color=%230077ff&style=for-the-badge'/>
+    <img src='https://img.shields.io/github/last-commit/Evilur/httpc?color=%230077ff&style=for-the-badge'/>
 </div>
 
 ## httpc
