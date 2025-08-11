@@ -119,6 +119,13 @@ void socket_handle_connection(const int client_fd, const char* ip_address) {
 
     /* If the file is a directory */
     if (S_ISDIR(file_stat.st_mode)) {
+        /* Check for '/' char in the end */
+        if (path_end[-1] != '/') {
+            strcpy(path_end, "/");  // Add '/' char at the end
+            http_return_redirect(client_fd, 301, path + 1);
+            return;
+        }
+
 #if READ_INDEX_HTML
         /* Check for index.html existence */
         strcpy(path_end, "index.html");
@@ -129,6 +136,8 @@ void socket_handle_connection(const int client_fd, const char* ip_address) {
         /* Reset the path */
         } else *path_end = '\0';
 #endif
+
+        /* Else just return the directory listing */
         http_return_directory(client_fd, path);
         return;
     }

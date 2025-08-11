@@ -41,6 +41,23 @@ void http_return_error(const int client_fd, const int e_code) {
     write(client_fd, buffer, (unsigned long)response_size);
 }
 
+void http_return_redirect(const int client_fd,
+                          const int code,
+                          const char* const location) {
+    char buffer[BUFFER_SIZE];
+    const int response_size = sprintf(
+        buffer,
+        "HTTP/1.1 %d REDIRECT\r\n"
+        "Location: %s\r\n"
+        "Content-Length: 0\r\n"
+        "\r\n",
+        code,
+        location
+    );
+    write(client_fd, buffer, (unsigned long)response_size);
+}
+
+
 void http_return_file(const int client_fd,
                       const char* path,
                       const long file_size) {
