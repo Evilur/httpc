@@ -82,8 +82,9 @@ void socket_handle_connection(const int client_fd, const char* ip_address) {
     /* Get the path to the file from the request */
     char* const path = buffer + 3;
     *path = '.';
-    char* const path_end = strchr(path, ' ');
+    char* path_end = strchr(path, ' ');
     if (path_end != NULL) *path_end = '\0';
+    else path_end = path + strlen(path);
 
     /* Decode the url string */
     url_decode(path);
@@ -118,6 +119,16 @@ void socket_handle_connection(const int client_fd, const char* ip_address) {
 
     /* If the file is a directory */
     if (S_ISDIR(file_stat.st_mode)) {
+#if READ_INDEX_HTML
+        /* Check for index.html existence */
+        strcpy(path_end, "index.html");
+        if (access(path, R_OK) != -1) {
+            stat(path, &file_stat);
+            http_return_file(client_fd, path, file_stat.st_size);
+            return;
+        /* Reset the path */
+        } else *path_end = '\0';
+#endif
         http_return_directory(client_fd, path);
         return;
     }

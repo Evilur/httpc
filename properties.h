@@ -8,5 +8,6 @@
 
 #define GET_MIME_TYPE 0
 #define NON_BLOCKING 1
+#define READ_INDEX_HTML 1
 
 #endif
