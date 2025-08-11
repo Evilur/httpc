@@ -4,6 +4,7 @@
 #define DEFAULT_PORT 8000
 #define BUFFER_SIZE 1024
 #define TIMEOUT_SECONDS 5
+#define MAX_FORKS_NUMBER 1024 * 8
 
 #define GET_MIME_TYPE 0
 #define NON_BLOCKING 1

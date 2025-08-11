@@ -8,6 +8,8 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
 
 int main(const int argc, const char* const* const argv) {
     /* Get the port to listen to */
@@ -22,6 +24,15 @@ int main(const int argc, const char* const* const argv) {
 #if NON_BLOCKING
     /* Ignore SIGCHLD to avoid zombie children */
     signal(SIGCHLD, SIG_IGN);
+
+    /* Make shared variable to monitor the number of forks */
+    int* const forks_number = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
+                            MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (forks_number == MAP_FAILED) {
+        perror("Failed to mmap");
+        return -1;
+    }
+    *forks_number = 0;
 #endif
 
     /* Handle all connections */
@@ -50,10 +61,11 @@ int main(const int argc, const char* const* const argv) {
        }
 
 #if NON_BLOCKING
+        /* If there is too much forks, wait for a one fork */
+        if (*forks_number >= MAX_FORKS_NUMBER) wait(NULL);
+
         /* Fork the process */
         const int pid = fork();
-
-        /* If it is impossible to fork the program */
         if (pid == -1) {
             perror("Failed to fork the process");
             return -1;
@@ -61,6 +73,9 @@ int main(const int argc, const char* const* const argv) {
 
         /* If it is a child */
         if (pid == 0) {
+            /* Increase the number of forks */
+            (*forks_number)++;
+
             /* Close the server descriptor */
             close(server_fd);
 
@@ -70,6 +85,9 @@ int main(const int argc, const char* const* const argv) {
 
             /* Close the connection */
             close(client_fd);
+
+            /* Decrease the number of forks */
+            (*forks_number)--;
 
             /* Exit the program */
             return 0;
