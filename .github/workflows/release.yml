@@ -20,6 +20,31 @@ jobs:
                   name: httpc_linux_amd64
                   path: deb/httpc_linux_amd64.deb
                   compression-level: 9
+    linux-build:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                arch: [mips]
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Install cross compiler
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y gcc-${{ matrix.arch }}-linux-gnu
+
+            - name: Make
+              run: make all deb PREFIX=/usr \
+                   ARCH=${{ matrix.arch }} DEST=linux \
+                   CC=${{ matrix.arch }}-linux-gnu-gcc
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: httpc_linux_${{ matrix.arch }}
+                  path: deb/httpc_linux_${{ matrix.arch }}.deb
+                  compression-level: 9
     termux-build:
         runs-on: ubuntu-latest
         strategy:
