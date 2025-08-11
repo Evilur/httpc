@@ -4,7 +4,7 @@ BUILD ?= Release
 # Compiler and its flags
 CC ?= gcc
 ifeq ($(BUILD),Debug)
-	CFLAGS = -Werror -g3 -O0 -std=c99\
+	CFLAGS := -Werror -g3 -O0 -std=c99\
 			 -Wall -Wextra -Wpedantic -Wshadow -Wcast-align -Wformat=2 \
 			 -Wconversion -Wsign-conversion -Wmissing-declarations\
 			 -Wmissing-prototypes -Wlogical-op -Wold-style-definition\
@@ -15,41 +15,43 @@ ifeq ($(BUILD),Debug)
 			 -Wstack-protector -Wstack-protector -Wstrict-overflow=5\
 			 -Wcast-qual -Wmissing-noreturn -Wjump-misses-init
 else
-	CFLAGS = -std=c99 -static -O2 -flto -funroll-loops
+	CFLAGS := -std=c99 -static -O2 -flto -funroll-loops
 endif
 
 # Set the app name and version
-TARGET  = httpc
-VERSION = 1.0.0
+TARGET  := httpc
+VERSION := 1.1.0
 
 # Set source and object directories
-SRCDIR = src
-OBJDIR = obj
-BINDIR = bin
-DEBDIR = deb
+SRCDIR := src
+OBJDIR := obj
+BINDIR := bin
+DEBDIR := deb
+AURDIR := aur
 
 # Prefixes
 PREFIX    ?= /usr/local
 BINPREFIX ?= $(PREFIX)/bin
 
 # Get all source files and object file names
-SRCS = $(wildcard $(SRCDIR)/*.c)
-OBJS = $(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SRCS))
+SRCS := $(wildcard $(SRCDIR)/*.c)
+OBJS := $(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SRCS))
 
 # Set targets that do not create new files
-.PHONY: all clean install uninstall deb
+.PHONY: all clean install uninstall deb aur
 
 # Default target
 all: $(BINDIR)/$(TARGET)
 
 # Clean all compiled C binaries
 clean:
-	rm -rf $(OBJDIR) $(BINDIR) $(DEBDIR)
+	rm -rf $(OBJDIR) $(BINDIR) $(DEBDIR) $(AURDIR)
 
 # Install the binary to the system
 install: $(BINDIR)/$(TARGET)
 	@mkdir -p $(BINPREFIX)
 	cp $(BINDIR)/$(TARGET) $(BINPREFIX)
+	chmod 755 $(BINPREFIX)/$(TARGET)
 
 # Uninstall the binary from the system
 uninstall:
@@ -86,6 +88,43 @@ endif
 
 	# Build package
 	dpkg-deb --root-owner-group --build $(PACKAGEDIR)
+
+aur:
+ifeq ($(SHA512SUM),)
+	$(error SHA512SUM variable is not defined)
+	exit -1
+endif
+ifeq ($(SHA256SUM),)
+	$(error SHA256SUM variable is not defined)
+	exit -1
+endif
+	# Create an AUR PKGBUILD
+	mkdir -p $(AURDIR)
+	printf "\
+	pkgname=$(TARGET)\n\
+	pkgver=$(VERSION)\n\
+	pkgrel=1\n\
+	pkgdesc='A Simple zero-conf http 1.1 server to use instead of the python http.server'\n\
+	arch=('x86_64')\n\
+	url='https://github.com/Evilur/httpc'\n\
+	license=('MIT')\n\
+	source=(\"https://github.com/Evilur/httpc/archive/refs/tags/v\$$pkgver.tar.gz\")\n\
+	sha512sums=('$(SHA512SUM)')\n\
+	sha256sums=('$(SHA256SUM)')\n\
+	makedepends=('make' 'gcc')\n\
+	\n\
+	build() {\n\
+		cd \"\$$srcdir/\$$pkgname-\$$pkgver\"\n\
+		make\n\
+	}\n\
+	\n\
+	package() {\n\
+		cd \"\$$srcdir/\$$pkgname-\$$pkgver\"\n\
+		install -Dm755 $(BINDIR)/$(TARGET) \"\$$pkgdir/usr/bin/httpc\"\n\
+	}" > $(AURDIR)/PKGBUILD
+
+	# Make .SRCINFO
+	cd $(AURDIR) && makepkg --printsrcinfo > .SRCINFO
 
 # Link the target
 $(BINDIR)/$(TARGET): $(OBJS)
