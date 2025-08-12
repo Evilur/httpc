@@ -1,6 +1,10 @@
 #include "../properties.h"
 #include "http.h"
 
+#if GET_MIME_TYPE
+#include "mime.h"
+#endif
+
 #include <dirent.h>
 #include <fcntl.h>
 #include <stdio.h>

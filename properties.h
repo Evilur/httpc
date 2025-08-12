@@ -6,7 +6,7 @@
 #define TIMEOUT_SECONDS 5
 #define MAX_FORKS_NUMBER 1024 * 4
 
-#define GET_MIME_TYPE 0
+#define GET_MIME_TYPE 1
 #define NON_BLOCKING 1
 #define READ_INDEX_HTML 1
 
