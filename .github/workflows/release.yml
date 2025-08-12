@@ -4,33 +4,44 @@ on:
         tags:
             - '*'
 jobs:
-    linux-amd64-build:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-
-            - name: Make
-              run: make all deb PREFIX=/usr \
-                   ARCH=amd64 DEST=linux CC=gcc
-
-            - name: Upload artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: httpc_linux_amd64
-                  path: deb/httpc_linux_amd64.deb
-                  compression-level: 9
     linux-build:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                gcc:
+                build:
+                    - arch: amd64
+                      package: gcc-x86-64-linux-gnu
+                      gcc: x86_64-linux-gnu-gcc
+                    - arch: i386
+                      package: gcc-i686-linux-gnu
+                      gcc: i686-linux-gnu-gcc
                     - arch: arm64
                       package: gcc-aarch64-linux-gnu
-                      command: aarch64-linux-gnu-gcc
+                      gcc: aarch64-linux-gnu-gcc
+                    - arch: armhf
+                      package: gcc-arm-linux-gnueabihf
+                      gcc: arm-linux-gnueabihf-gcc
+                    - arch: armel
+                      package: gcc-arm-linux-gnueabi
+                      gcc: arm-linux-gnueabi-gcc
                     - arch: mips
                       package: gcc-mips-linux-gnu
-                      command: mips-linux-gnu-gcc
+                      gcc: mips-linux-gnu-gcc
+                    - arch: mips64el
+                      package: gcc-mips64el-linux-gnuabi64
+                      gcc: mips64el-linux-gnuabi64-gcc
+                    - arch: mipsel
+                      package: gcc-mipsel-linux-gnu
+                      gcc: mipsel-linux-gnu-gcc
+                    - arch: ppc64el
+                      package: gcc-powerpc64le-linux-gnu
+                      gcc: powerpc64le-linux-gnu-gcc
+                    - arch: s390x
+                      package: gcc-s390x-linux-gnu
+                      gcc: s390x-linux-gnu-gcc
+                    - arch: riscv64
+                      package: gcc-riscv64-linux-gnu
+                      gcc: riscv64-linux-gnu-gcc
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -38,18 +49,18 @@ jobs:
             - name: Install cross compiler
               run: |
                   sudo apt-get update
-                  sudo apt-get install -y ${{ matrix.gcc.package }}
+                  sudo apt-get install -y ${{ matrix.build.package }}
 
             - name: Make
               run: make all deb PREFIX=/usr \
-                   ARCH=${{ matrix.gcc.arch }} DEST=linux \
-                   CC=${{ matrix.gcc.command }}
+                   ARCH=${{ matrix.build.arch }} DEST=linux \
+                   CC=${{ matrix.build.gcc }}
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: httpc_linux_${{ matrix.gcc.arch }}
-                  path: deb/httpc_linux_${{ matrix.gcc.arch }}.deb
+                  name: httpc_linux_${{ matrix.build.arch }}
+                  path: deb/httpc_linux_${{ matrix.build.arch }}.deb
                   compression-level: 9
     termux-build:
         runs-on: ubuntu-latest
