@@ -1,16 +1,14 @@
 #include "../properties.h"
 #include "http.h"
-#include "mime.h"
 
-#include <stdio.h>
-#include <sys/socket.h>
-#include <sys/sendfile.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <dirent.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 /**
  * A wrapper for the strcmp() function

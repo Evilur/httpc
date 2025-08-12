@@ -1,9 +1,9 @@
+#if GET_MIME_TYPE
+
 #include "../properties.h"
 #include "mime.h"
 
 #include <string.h>
-
-#if GET_MIME_TYPE
 
 static int equal(const char* str1, const char* str2);
 

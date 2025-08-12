@@ -1,15 +1,15 @@
 #include "../properties.h"
 #include "socket.h"
 
+#include <arpa/inet.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <arpa/inet.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/mman.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 int main(const int argc, const char* const* const argv) {
     /* Get the port to listen to */

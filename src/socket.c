@@ -1,13 +1,13 @@
 #include "../properties.h"
-#include "socket.h"
 #include "http.h"
-#include "url.h"
+#include "socket.h"
 #include "string.h"
+#include "url.h"
 
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
+#include <stdio.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 int socket_listen_port(const unsigned short port) {
@@ -24,7 +24,7 @@ int socket_listen_port(const unsigned short port) {
                    &socket_opt, sizeof(socket_opt)) == -1) {
         perror("Failed to set socket options");
         return -1;
-                   }
+    }
 
     /* Init in address */
     const struct sockaddr_in server_address = {
