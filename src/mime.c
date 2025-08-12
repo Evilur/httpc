@@ -1204,7 +1204,7 @@ const char* mime_get_type(const char* ext) {
     if (equal(ext, "mp3"))
         return "audio/mp3";
     if (equal(ext, "mp4"))
-        return "application/mp4";
+        return "video/mp4";
     if (equal(ext, "mp4a"))
         return "audio/mp4";
     if (equal(ext, "mp4s"))
