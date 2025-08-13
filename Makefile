@@ -27,7 +27,7 @@ SRCDIR := src
 OBJDIR := obj
 BINDIR := bin
 DEBDIR := deb
-AURDIR := aur
+AURDIR := AUR
 
 # Prefixes
 PREFIX    ?= /usr/local
@@ -45,7 +45,7 @@ all: $(BINDIR)/$(TARGET)
 
 # Clean all compiled C binaries
 clean:
-	rm -rf $(OBJDIR) $(BINDIR) $(DEBDIR) $(AURDIR)
+	rm -rf $(OBJDIR) $(BINDIR) $(DEBDIR)
 
 # Install the binary to the system
 install: $(BINDIR)/$(TARGET)
