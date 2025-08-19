@@ -21,13 +21,17 @@
  */
 static int string_compare(const void* str1, const void* str2);
 
+static int write_data(int client_fd,
+                       const char* data,
+                       unsigned int data_size);
+
 /**
  * Write the http chunk to the socket
  * @param client_fd Client file descriptor
  * @param data A chunk buffer
  * @param data_size A Size of the chunk buffer
  */
-static void write_chunk(int client_fd,
+static int write_chunk(int client_fd,
                         const char* data,
                         unsigned int data_size);
 
@@ -40,7 +44,8 @@ void http_return_error(const int client_fd, const int e_code) {
         "\r\n",
         e_code
     );
-    write(client_fd, buffer, (unsigned long)response_size);
+    if (write_data(client_fd, buffer, (unsigned long)response_size) == -1)
+        perror("Failed to write the response to the client");
 }
 
 void http_return_redirect(const int client_fd,
@@ -56,7 +61,8 @@ void http_return_redirect(const int client_fd,
         code,
         location
     );
-    write(client_fd, buffer, (unsigned long)response_size);
+    if (write_data(client_fd, buffer, (unsigned long)response_size) == -1)
+        perror("Failed to write the response to the client");
 }
 
 
@@ -80,7 +86,10 @@ void http_return_file(const int client_fd,
     );
 
     /* Send headers */
-    write(client_fd, buffer, (unsigned long)header_size);
+    if (write_data(client_fd, buffer, (unsigned long)header_size) == -1) {
+        perror("Failed to write the response to the client");
+        return;
+    }
 
     /* Open the file for reading */
     const int file_fd = open(path, O_RDONLY);
@@ -91,12 +100,16 @@ void http_return_file(const int client_fd,
 
     /* Read the data to the buffer and send it to the socket */
     long read_size;
-    while ((read_size = read(file_fd, buffer, BUFFER_SIZE)) > 0)
-        if (read_size != -1) write(client_fd, buffer, (unsigned long)read_size);
-        else {
+    while ((read_size = read(file_fd, buffer, BUFFER_SIZE)) > 0) {
+        if (read_size == -1) {
             perror("Failed to read the file");
             return;
         }
+        if (write_data(client_fd, buffer, (unsigned long)read_size) == -1) {
+            perror("Failed to write the response to the client");
+            return;
+        }
+    }
 }
 
 #pragma GCC diagnostic push
@@ -167,7 +180,10 @@ void http_return_directory(const int client_fd, const char* const path) {
         path_size - 1 + 69,
         path + 1
     );
-    write(client_fd, buffer, (unsigned long)response_beg_size);
+    if (write_data(client_fd, buffer, (unsigned long)response_beg_size) == -1) {
+        perror("Failed to write the response to the client");
+        return;
+    }
 
     /* An array to store the entry path */
     char entry_path[path_size + ENTRY_NAME_SIZE];
@@ -222,11 +238,12 @@ void http_return_directory(const int client_fd, const char* const path) {
     if (buffer_offset != 0) write_chunk(client_fd, buffer, buffer_offset);
 
     /* Send the close chunk */
-    write(client_fd,
-          "\r\n"
-          "0\r\n"
-          "\r\n",
-          7);
+    if (write_data(client_fd,
+                   "\r\n"
+                   "0\r\n"
+                   "\r\n",
+                   7) == -1)
+        perror("Failed to write the response to the client");
 }
 #pragma GCC diagnostic pop
 
@@ -234,7 +251,28 @@ static int string_compare(const void* str1, const void* str2) {
     return strcmp(str1, str2);
 }
 
-static void write_chunk(const int client_fd,
+static int write_data(const int client_fd,
+                      const char* data,
+                      unsigned int data_size){
+    /* Try to write all the data */
+    while (data_size > 0) {
+        /* Write the data and get the length of written data */
+        const long written_len = write(client_fd, data, data_size);
+
+        /* If we get an error */
+        if (written_len == -1) return -1;
+
+        /* If all is OK, add an offset to the pointer and decrease
+         * the data_size variable */
+        data += written_len;
+        data_size -= written_len;
+    }
+
+    /* If all is OK, return success code */
+    return 0;
+}
+
+static int write_chunk(const int client_fd,
                         const char* const data,
                         const unsigned int data_size) {
     /* Buffer to store the chunk size */
@@ -245,6 +283,9 @@ static void write_chunk(const int client_fd,
     const int size_buffer_size = sprintf(size_buffer, "\r\n%x\r\n", data_size);
 
     /* Send this buffer and data to the client */
-    write(client_fd, size_buffer, (unsigned long)size_buffer_size);
-    write(client_fd, data, data_size);
+    if (write_data(
+            client_fd, size_buffer, (unsigned long)size_buffer_size
+        ) == -1
+        || write_data(client_fd, data, data_size) == -1) return -1;
+    else return 0;
 }
