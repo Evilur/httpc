@@ -1,11 +1,11 @@
 #include "../properties.h"
 #include "http.h"
 #include "socket.h"
-#include "string.h"
 #include "url.h"
 
 #include <netinet/in.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -61,10 +61,10 @@ void socket_handle_connection(const int client_fd, const char* ip_address) {
     if (request_size == -1) return;
 
     /* Get the end of the request line */
-    char* const request_line_end = memchr(buffer,
-                                          '\r',
-                                          (unsigned long)request_size);
-    if (request_line_end != NULL) *request_line_end = '\0';
+    char* request_line_end = memchr(buffer, '\r', (unsigned long)request_size);
+    if (request_line_end[1] != '\n') request_line_end = NULL;
+    if (request_line_end == NULL) request_line_end = buffer + request_size - 1;
+    *request_line_end = '\0';
 
     /* Log the message */
     printf("[%s] %s\n", ip_address, buffer);
