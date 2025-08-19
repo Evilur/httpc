@@ -13,13 +13,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/**
- * A wrapper for the strcmp() function
- * @note { Only for usage in the qsort() function }
- * @warning { Use strcmp() instead }
- */
-static int string_compare(const void* str1, const void* str2);
-
 static int write_data(int client_fd,
                       const char* data,
                       unsigned long data_size);
@@ -154,7 +147,7 @@ void http_return_directory(const int client_fd, const char* const path) {
     closedir(dir);
 
     /* Sort the array of entry names */
-    qsort(entry_names, entry_number, ENTRY_NAME_SIZE, string_compare);
+    qsort(entry_names, entry_number, ENTRY_NAME_SIZE, (int(*)(const void*, const void*))strcmp);
 
     /* Buffer to store and send the data */
     char buffer[BUFFER_SIZE];
@@ -243,10 +236,6 @@ void http_return_directory(const int client_fd, const char* const path) {
         perror("Failed to write the response to the client");
 }
 #pragma GCC diagnostic pop
-
-static int string_compare(const void* str1, const void* str2) {
-    return strcmp(str1, str2);
-}
 
 static int write_data(const int client_fd,
                       const char* data,
