@@ -90,7 +90,9 @@ void socket_handle_connection(const int client_fd, const char* ip_address) {
     url_decode(path);
 
     /* Try to find '/../' in the path */
-    if (strstr(path, "/../") != NULL) {
+    if (strncmp(path, "../", 3) == 0 ||
+        strcmp(path_end - 3, "/..") == 0 ||
+        strstr(path, "/../") != NULL) {
         http_return_error(client_fd, 403);
         return;
     }
