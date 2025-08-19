@@ -99,16 +99,11 @@ void http_return_file(const int client_fd,
 
     /* Read the data to the buffer and send it to the socket */
     long read_size;
-    while ((read_size = read(file_fd, buffer, BUFFER_SIZE)) > 0) {
-        if (read_size == -1) {
-            perror("Failed to read the file");
-            goto end;
-        }
+    while ((read_size = read(file_fd, buffer, BUFFER_SIZE)) > 0)
         if (write_data(client_fd, buffer, (unsigned long)read_size) == -1) {
             perror("Failed to write the response to the client");
             goto end;
         }
-    }
 
     /* Close the file descriptor */
     end:
