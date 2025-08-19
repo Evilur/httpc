@@ -103,13 +103,17 @@ void http_return_file(const int client_fd,
     while ((read_size = read(file_fd, buffer, BUFFER_SIZE)) > 0) {
         if (read_size == -1) {
             perror("Failed to read the file");
-            return;
+            goto end;
         }
         if (write_data(client_fd, buffer, (unsigned long)read_size) == -1) {
             perror("Failed to write the response to the client");
-            return;
+            goto end;
         }
     }
+
+    /* Close the file descriptor */
+    end:
+    close(file_fd);
 }
 
 #pragma GCC diagnostic push
