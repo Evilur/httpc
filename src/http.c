@@ -10,7 +10,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -22,8 +21,8 @@
 static int string_compare(const void* str1, const void* str2);
 
 static int write_data(int client_fd,
-                       const char* data,
-                       unsigned int data_size);
+                      const char* data,
+                      unsigned long data_size);
 
 /**
  * Write the http chunk to the socket
@@ -180,7 +179,7 @@ void http_return_directory(const int client_fd, const char* const path) {
         "<h1>Directory listing for %s</h1>"
         "<hr>"
         "<ul>"
-        "<li><a href='../'>../</a></li>",
+        "<li><a href='../'>../</a></li>\r\n",
         path_size - 1 + 69,
         path + 1
     );
@@ -243,10 +242,9 @@ void http_return_directory(const int client_fd, const char* const path) {
 
     /* Send the close chunk */
     if (write_data(client_fd,
-                   "\r\n"
                    "0\r\n"
                    "\r\n",
-                   7) == -1)
+                   5) == -1)
         perror("Failed to write the response to the client");
 }
 #pragma GCC diagnostic pop
@@ -257,7 +255,7 @@ static int string_compare(const void* str1, const void* str2) {
 
 static int write_data(const int client_fd,
                       const char* data,
-                      unsigned int data_size){
+                      unsigned long data_size){
     /* Try to write all the data */
     while (data_size > 0) {
         /* Write the data and get the length of written data */
@@ -268,8 +266,8 @@ static int write_data(const int client_fd,
 
         /* If all is OK, add an offset to the pointer and decrease
          * the data_size variable */
-        data += written_len;
-        data_size -= written_len;
+        data += (unsigned long)written_len;
+        data_size -= (unsigned long)written_len;
     }
 
     /* If all is OK, return success code */
@@ -280,16 +278,16 @@ static int write_chunk(const int client_fd,
                         const char* const data,
                         const unsigned int data_size) {
     /* Buffer to store the chunk size */
-    char size_buffer[sizeof("\r\n00000000\r\n")];
+    char size_buffer[sizeof("00000000\r\n")];
 
     /* Convert integer into the hex string
      * and write it to the buffer (right after '\r\n') */
-    const int size_buffer_size = sprintf(size_buffer, "\r\n%x\r\n", data_size);
+    const int size_buffer_size = sprintf(size_buffer, "%x\r\n", data_size);
 
     /* Send this buffer and data to the client */
-    if (write_data(
-            client_fd, size_buffer, (unsigned long)size_buffer_size
-        ) == -1
-        || write_data(client_fd, data, data_size) == -1) return -1;
+    if (write_data(client_fd, size_buffer,
+                   (unsigned long)size_buffer_size) == -1
+        || write_data(client_fd, data, data_size) == -1
+        || write(client_fd , "\r\n", 2) == -1) return -1;
     else return 0;
 }
