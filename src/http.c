@@ -270,8 +270,8 @@ static int write_chunk(const int client_fd,
 
     /* Send this buffer and data to the client */
     if (write_data(client_fd, size_buffer,
-                   (unsigned long)size_buffer_size) == -1
-        || write_data(client_fd, data, data_size) == -1
-        || write(client_fd , "\r\n", 2) == -1) return -1;
+                   (unsigned long)size_buffer_size) == -1 ||
+        write_data(client_fd, data, data_size) == -1 ||
+        write(client_fd , "\r\n", 2) == -1) return -1;
     else return 0;
 }
