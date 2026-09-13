@@ -3,3 +3,5 @@
 /deb
 /AUR
 /.idea
+nvim.Makefile
+compile_commands.json
