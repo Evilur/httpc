@@ -1,104 +1,95 @@
 #include "../properties.h"
+#include "error.h"
 #include "socket.h"
 
-#include <arpa/inet.h>
-#include <signal.h>
+#include <netinet/in.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/mman.h>
+#include <string.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
-#include <sys/time.h>
-#include <sys/wait.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
-int main(const int argc, const char* const* const argv) {
-    /* Get the port to listen to */
-    unsigned short port = argc > 1 ? (unsigned short)atoi(argv[1])
-                                   : DEFAULT_PORT;
-    if (port == 0) port = DEFAULT_PORT;
+/**
+ * Init parameters by arguments
+ * @param argc The number of arguments
+ * @param argv The array of arguments
+ * @param directory The pointer to the directory string
+ * @param port The pointer to the port variable
+ */
+static int32_t init_params(const int32_t argc,
+                           const char* const* const argv,
+                           const char** directory,
+                           port_t* port);
 
-    /* Try to open the socket connection */
-    const int server_fd = socket_listen_port(port);
-    if (server_fd == -1) return -1;
+/**
+ * Print the help message
+ */
+static void print_help(void);
 
-#if NON_BLOCKING
-    /* Ignore SIGCHLD to avoid zombie children */
-    signal(SIGCHLD, SIG_IGN);
+int32_t main(const int32_t argc, const char* const* const argv) {
+    /* Init the parameters */
+    const char* directory = getcwd(NULL, 0);
+    port_t port = DEFAULT_PORT;
+    init_params(argc, argv, &directory, &port);
 
-    /* Make shared variable to monitor the number of forks */
-    int* const forks_number = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
-                            MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    if (forks_number == MAP_FAILED) {
-        perror("Failed to mmap");
+    /* Init the socket */
+    socket_fd_t server_fd;
+    if (socket_init(port, &server_fd) == -1) return -1;
+
+    /* Return the success code */
+    return 0;
+}
+
+static int32_t init_params(const int32_t argc,
+                           const char* const* const argv,
+                           const char** const directory,
+                           port_t* const port) {
+    /* Init default values */
+    *directory = getcwd(NULL, 0);
+    *port = DEFAULT_PORT;
+
+    /* Read arguments */
+    for (int32_t i = 1; i < argc; ++i) {
+        const char* const arg = argv[i];
+        struct stat st;
+
+        /* Check for help arg */
+        if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
+            print_help();
+            return -1;
+        }
+
+        /* Check for directory */
+        else if (stat(arg, &st) == 0 && S_ISDIR(st.st_mode))
+            *directory = arg;
+
+        /* Check for port */
+        else {
+            const port_t possible_port = (port_t)atoi(arg);
+            if (possible_port != 0) *port = possible_port;
+        }
+    }
+
+    /* Validate the parameters */
+    if (directory == NULL) {
+        printerr("Failed to get the directory");
         return -1;
     }
-    *forks_number = 0;
-#endif
-
-    /* Handle all connections */
-    for (;;) {
-        /* Init a struct to store the client address */
-        struct sockaddr_in client_address;
-        int client_addrlen = sizeof(client_address);
-
-        /* Accept the connection */
-        const int client_fd = accept(server_fd,
-                                     (struct sockaddr*)&client_address,
-                                     (socklen_t*)&client_addrlen);
-
-        /* Check the descriptor */
-        if (client_fd == -1) {
-            perror("Failed to accept the connection");
-            return -1;
-        }
-
-        /* Set the timeout */
-        struct timeval timeout = { .tv_sec = TIMEOUT_SECONDS };
-        if (setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO,
-                       &timeout, sizeof(timeout)) == -1) {
-            perror("Failed to set the timeout");
-            return -1;
-       }
-
-#if NON_BLOCKING
-        /* If there is too much forks, wait for a one fork */
-        if (*forks_number >= MAX_FORKS_NUMBER) wait(NULL);
-
-        /* Fork the process */
-        const int pid = fork();
-        if (pid == -1) {
-            perror("Failed to fork the process");
-            return -1;
-        }
-
-        /* If it is a child */
-        if (pid == 0) {
-            /* Increase the number of forks */
-            (*forks_number)++;
-
-            /* Close the server descriptor */
-            close(server_fd);
-
-            /* Handle this connection */
-            socket_handle_connection(client_fd,
-                                     inet_ntoa(client_address.sin_addr));
-
-            /* Close the connection */
-            close(client_fd);
-
-            /* Decrease the number of forks */
-            (*forks_number)--;
-
-            /* Exit the program */
-            return 0;
-        }
-#else
-        /* Handle this connection */
-        socket_handle_connection(client_fd, inet_ntoa(client_address.sin_addr));
-#endif
-
-        /* If it is a parent process (or hasn't been forked),
-         * close the client descriptor */
-        close(client_fd);
+    if (port == 0) {
+        printerr("Invalid port");
+        return -1;
     }
+
+    /* Return the success code */
+    return 0;
+}
+
+static void print_help(void) {
+    puts("\
+NAME:\n\
+\thttpc - HyperText Transfer Protocol on C\n\
+");
 }

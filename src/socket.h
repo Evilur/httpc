@@ -1,8 +1,11 @@
-#ifndef HTTPC_SOCKET
-#define HTTPC_SOCKET
+#ifndef SOCKET_H
+#define SOCKET_H
 
-int socket_listen_port(unsigned short port);
+#include <stdint.h>
 
-void socket_handle_connection(int client_fd, const char* ip_address);
+typedef uint16_t port_t;
+typedef int32_t socket_fd_t;
+
+socket_fd_t socket_init(const port_t port, socket_fd_t* server_fd);
 
 #endif
