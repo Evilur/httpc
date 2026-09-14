@@ -18,12 +18,13 @@ int32_t event_loop_create(event_loop_t* const event_loop) {
 }
 
 int32_t event_loop_register_event(const event_loop_t* const event_loop,
+                                  const event_type_t event_type,
                                   const socket_fd_t socket_fd,
-                                  const event_type_t event_type) {
+                                  void* const connection) {
     /* Create an event */
     epoll_event_t epoll_event = {
         .events = event_type,
-        .data.fd = socket_fd
+        .data.ptr = connection
     };
 
     /* Try to register the event */
@@ -53,18 +54,18 @@ int32_t event_loop_remove_event(const event_loop_t* const event_loop,
 int32_t event_loop_wait(event_loop_t* const event_loop) {
     return epoll_wait(event_loop->epoll_fd,
                       event_loop->events,
-                      MAX_EVENTS_PER_ITERATION, -1);
+                      MAX_CONNECTIONS_PER_ITERATION, -1);
 }
 
-void event_loop_get_events(const event_loop_t* const event_loop,
-                           event_t* events,
-                           int32_t events_num) {
-    const epoll_event_t* epoll_events = event_loop->events;
-    while (events_num > 0) {
-        events->socket_fd = epoll_events->data.fd;
-        ++events;
+void event_loop_get_connections(event_loop_t* const event_loop,
+                                void** connections,
+                                int32_t connections_num) {
+    epoll_event_t* epoll_events = event_loop->events;
+    while (connections_num > 0) {
+        *connections = epoll_events->data.ptr;
+        ++connections;
         ++epoll_events;
-        --events_num;
+        --connections_num;
     }
 }
 

@@ -13,6 +13,10 @@ int32_t socket_create(socket_fd_t* const socket_fd) {
         return -1;
     }
 
+    /* Set socket options */
+    int32_t opt = 1;
+    setsockopt(*socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
     /* Return the success code */
     return 0;
 }
@@ -48,6 +52,20 @@ int32_t socket_listen(const socket_fd_t socket_fd) {
     return 0;
 }
 
-void socket_close(socket_fd_t socket_fd) {
+int32_t socket_receive(const socket_fd_t socket_fd,
+                       char* const buffer, int32_t buffer_size) {
+    /* Receive the data */
+    const int32_t received_size =
+        (int32_t)recv(socket_fd, buffer, (uint64_t)buffer_size, 0);
+
+    /* If there is an error */
+    if (received_size == -1)
+        printerr("Failed to receive a data by socket");
+
+    /* Return the received data size */
+    return received_size;
+}
+
+void socket_close(const socket_fd_t socket_fd) {
     close(socket_fd);
 }

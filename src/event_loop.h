@@ -10,19 +10,35 @@
 typedef int32_t epoll_fd_t;
 typedef struct epoll_event epoll_event_t;
 
+typedef enum {
+    CONNECTION_SERVER,
+    CONNECTION_CLIENT
+} connection_type_t;
+
 /**
- * Event struct
+ * Server connection struct
  */
-typedef struct event {
+typedef struct server_connection {
+    connection_type_t type;
     socket_fd_t socket_fd;
-} event_t;
+} server_connection_t;
+
+/**
+ * Client connection struct
+ */
+typedef struct connection {
+    connection_type_t type;
+    socket_fd_t socket_fd;
+    char buffer[MAX_BUFFER_SIZE];
+    int32_t buffer_offset;
+} connection_t;
 
 /**
  * Event loop struct
  */
 typedef struct event_loop {
     epoll_fd_t epoll_fd;
-    epoll_event_t events[MAX_EVENTS_PER_ITERATION];
+    epoll_event_t events[MAX_CONNECTIONS_PER_ITERATION];
 } event_loop_t;
 
 /**
@@ -44,10 +60,12 @@ int32_t event_loop_create(event_loop_t* event_loop);
  * @param even_loop The struct to register the event
  * @param socket_fd The socket file descryptor to listen for events
  * @param event_type The event type to listen
+ * @param event The event which will be returned in the loop
  */
 int32_t event_loop_register_event(const event_loop_t* event_loop,
+                                  event_type_t event_type,
                                   socket_fd_t socket_fd,
-                                  event_type_t event_type);
+                                  void* connection);
 
 /**
  * Remove the event from the event loop
@@ -68,8 +86,9 @@ int32_t event_loop_wait(event_loop_t* event_loop);
  * @param event_loop The struct to get the events
  * @param events The pointer to store the events array
  */
-void event_loop_get_events(const event_loop_t* event_loop,
-                           event_t* events, int32_t events_num);
+void event_loop_get_connections(event_loop_t* event_loop,
+                                void** connections,
+                                int32_t connections_num);
 
 /**
  * Close the event loop

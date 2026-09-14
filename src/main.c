@@ -2,11 +2,14 @@
 #include "arg_handler.h"
 #include "error.h"
 #include "event_loop.h"
+#include "null.h"
+#include "server.h"
 #include "socket.h"
 
 #include <netinet/in.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -26,32 +29,88 @@ int32_t main(const int32_t argc, const char* const* const argv) {
         return -1;
     printf("Start listening on http://0.0.0.0:%hu\n", port);
 
+    /* Create a connection structure */
+    server_connection_t server_connection = {
+        .type = CONNECTION_SERVER,
+        .socket_fd = server_fd
+    };
+
     /* Init the event loop and register the server event */
     event_loop_t event_loop;
     if (event_loop_create(&event_loop) == -1 ||
-        event_loop_register_event(&event_loop, server_fd, READY_READ) == -1)
+        event_loop_register_event(&event_loop, READY_READ,
+                                  server_fd,
+                                  &server_connection) == -1)
         return -1;
 
     /* Create the array to store the events */
-    event_t events[MAX_EVENTS_PER_ITERATION];
+    void* connections[MAX_CONNECTIONS_PER_ITERATION];
 
     /* Run the event loop */
     for (;;) {
         /* Get events */
         const int32_t events_num = event_loop_wait(&event_loop);
-        event_loop_get_events(&event_loop, events, events_num);
+        event_loop_get_connections(&event_loop, connections, events_num);
 
         /* Loop through the events */
-        for (int32_t i = 0; i < events_num; ++i) {
-            /* Get the socket file decryptor from the event */
-            const socket_fd_t socket_fd = events[i].socket_fd;
+        for (void** connection_ptr = connections,
+             * const* const connections_end = connections + events_num;
+             connection_ptr < connections_end; ++connection_ptr) {
+            /* Get a connection and a fd */
+            connection_t* connection = *connection_ptr;
+            const socket_fd_t socket_fd = connection->socket_fd;
 
             /* Server socket event */
             if (socket_fd == server_fd) {
+                /* Accept the client connection */
+                socket_fd_t client_fd;
+                if (server_accept_connection(server_fd, &client_fd) == -1)
+                    continue;
+
+                /* Malloc for the new connection */
+                connection_t* const new_connection =
+                    malloc(sizeof(connection_t));
+                if (new_connection == null) {
+                    printerr("Failed to allocate the "
+                             "memory for a new connection");
+                    continue;
+                }
+
+                /* Fill the parameters of a new connection */
+                new_connection->socket_fd = client_fd;
+                new_connection->buffer_offset = 0;
+
+                /* Register the client fd in the event loop */
+                if (event_loop_register_event(&event_loop, READY_READ,
+                                              client_fd,
+                                              new_connection) == -1) {
+                    free(new_connection);
+                    socket_close(client_fd);
+                }
             }
 
             /* Client socket event */
             else {
+                /* Get the buffer */
+                char* const buffer = connection->buffer;
+                const int32_t buffer_size = sizeof(connection->buffer);
+                int32_t* buffer_offset = &connection->buffer_offset;
+
+                /* Try to receive the request
+                 * If the client has closed the connection (1 code)
+                 * Or there is an error somewhere (-1 code)
+                 * Close the socket, remove the event from the event loop
+                 * And free the connection
+                 */
+                if (server_receive_request(socket_fd, buffer,
+                                           buffer_size, buffer_offset) != 0) {
+                    socket_close(socket_fd);
+                    event_loop_remove_event(&event_loop, socket_fd);
+                    free(connection);
+                    continue;
+                }
+
+                /* Try to handle the request */
             }
         }
     }
