@@ -2,16 +2,20 @@
 #include "http.h"
 #include "error.h"
 #include "null.h"
+#include "util.h"
 
 #include <stdio.h>
 #include <string.h>
 
 int32_t http_handle_uri(http_request_headers_t* const request_headers,
                         const socket_fd_t socket_fd,
-                        char* const* const buffer_ptr,
+                        char** const buffer_ptr,
                         int32_t* const buffer_size) {
+    /* Create a conts buffer pointer */
+    char* const buffer = *buffer_ptr;
+
     /* Try to get the new line sequence */
-    const char* const next_line = strstr(*buffer_ptr, "\r\n");
+    const char* const next_line = util_memmem(buffer, *buffer_size, "\r\n", 2);
 
     /* If there is not a full string in the buffer */
     if (next_line == null) {
@@ -20,7 +24,7 @@ int32_t http_handle_uri(http_request_headers_t* const request_headers,
             /* If we have not even a uri yet */
             if (request_headers->uri == null) {
                 http_send_default_response(
-                    socket_fd, *buffer_ptr, *buffer_size,
+                    socket_fd, buffer, *buffer_size,
                     414, "URI Too Long"
                 );
                 return -1;
@@ -30,7 +34,114 @@ int32_t http_handle_uri(http_request_headers_t* const request_headers,
         return 1;
     }
 
-    /* If there is a uri string in the buffer */
+    /* If there is a uri string in the buffer,
+     * Try to get the request method */
+    switch (*(*buffer_ptr)++) {
+        case 'G':
+            if (memcmp(*buffer_ptr, "ET ", 3) == 0) {
+                http_set_request_method(request_headers, HTTP_METHOD_GET);
+                *buffer_ptr += 3;
+            }
+            else goto invalid_method;
+            break;
+
+        case 'H':
+            if (memcmp(*buffer_ptr, "EAD ", 4) == 0) {
+                http_set_request_method(request_headers, HTTP_METHOD_HEAD);
+                *buffer_ptr += 4;
+            }
+            else goto invalid_method;
+            break;
+
+        case 'P':
+            switch (*(*buffer_ptr)++) {
+                case 'O':
+                    if (memcmp(*buffer_ptr, "ST ", 3) == 0) {
+                        http_set_request_method(request_headers,
+                                                HTTP_METHOD_POST);
+                        *buffer_ptr += 3;
+                    }
+                    else goto invalid_method;
+                    break;
+
+                case 'U':
+                    if (memcmp(*buffer_ptr, "T ", 2) == 0) {
+                        http_set_request_method(request_headers,
+                                                HTTP_METHOD_PUT);
+                        *buffer_ptr += 2;
+                    }
+                    else goto invalid_method;
+                    break;
+
+                case 'A':
+                    if (memcmp(*buffer_ptr, "TCH ", 4) == 0) {
+                        http_set_request_method(request_headers,
+                                                HTTP_METHOD_PATCH);
+                        *buffer_ptr += 4;
+                    }
+                    else goto invalid_method;
+                    break;
+
+                default: goto invalid_method;
+            }
+            break;
+
+        case 'D':
+            if (memcmp(*buffer_ptr, "ELETE ", 6) == 0) {
+                http_set_request_method(request_headers, HTTP_METHOD_DELETE);
+                *buffer_ptr += 6;
+            }
+            else goto invalid_method;
+            break;
+
+        case 'O':
+            if (memcmp(*buffer_ptr, "PTIONS ", 7) == 0) {
+                http_set_request_method(request_headers, HTTP_METHOD_OPTIONS);
+                *buffer_ptr += 7;
+            }
+            else goto invalid_method;
+            break;
+
+        default:
+        invalid_method:
+            http_send_default_response(socket_fd, buffer, *buffer_size,
+                                       501, "Not Implemented");
+            return -1;
+    }
+
+    /* Save the uri */
+    request_headers->uri = *buffer_ptr;
+
+    /* Unescape the uri in-place */
+    char *source_ptr = *buffer_ptr;
+    char *dest_ptr = *buffer_ptr;
+    while (*source_ptr != '\0' && *source_ptr != ' ' && *source_ptr != '\r') {
+        if (*source_ptr == '%') {
+            /* Get hex values */
+            const int high = util_hexval((unsigned char)*++source_ptr);
+            const int low = util_hexval((unsigned char)*++source_ptr);
+
+            /* If there is an invalid uri */
+            if (high == -1 || low == -1) {
+                http_send_default_response(socket_fd, buffer, *buffer_size,
+                                           400, "Bad Request");
+                return -1;
+            }
+
+            /* Write the data and update the pointers */
+            *dest_ptr = (char)((high << 4) | low);
+            ++dest_ptr;
+            ++source_ptr;
+        } else {
+            /* Write the data and update the pointers */
+            *dest_ptr = *source_ptr;
+            ++dest_ptr;
+            ++source_ptr;
+        }
+    }
+
+    /* Set the terminate character */
+    *dest_ptr = '\0';
 
     /* If we successfully handled the uri,
      * Return the success code */

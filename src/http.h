@@ -84,7 +84,7 @@ typedef struct http_request_headers {
 
 int32_t http_handle_uri(http_request_headers_t* request_headers,
                         socket_fd_t socket_fd,
-                        char* const* buffer_ptr, int32_t* buffer_size);
+                        char** buffer_ptr, int32_t* buffer_size);
 
 int32_t http_send_default_response(socket_fd_t socket_fd,
                                    char* buffer, int32_t buffer_size,

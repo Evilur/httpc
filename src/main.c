@@ -128,9 +128,9 @@ int32_t main(const int32_t argc, const char* const* const argv) {
                 int32_t buffer_size = *buffer_filled;
 
                 /* Try to handle the request */
-                if (connection_state == HTTP_CONNECTION_READING_URI &&
+                if (*connection_state == HTTP_CONNECTION_READING_URI &&
                     http_handle_uri(request_headers, socket_fd,
-                                    &buffer_ptr, &buffer_size))
+                                    &buffer_ptr, &buffer_size) == 0)
                     ++*connection_state;
             }
         }
