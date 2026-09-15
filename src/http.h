@@ -6,17 +6,22 @@
 
 #include <stdint.h>
 
-#define HTTP_METHOD_SHIFT             0x0u
-#define HTTP_TRANSFER_ENCODING_SHIFT  0x3u
-#define HTTP_CONTENT_ENCODING_SHIFT   0x4u
-#define HTTP_ACCEPT_ENCODING_SHIFT    0x6u
-#define HTTP_CONNECTION_SHIFT         0x9u
+#define HTTP_METHOD_SHIFT             (uint16_t)0x0u
+#define HTTP_TRANSFER_ENCODING_SHIFT  (uint16_t)0x3u
+#define HTTP_CONTENT_ENCODING_SHIFT   (uint16_t)0x4u
+#define HTTP_ACCEPT_ENCODING_SHIFT    (uint16_t)0x6u
+#define HTTP_CONNECTION_SHIFT         (uint16_t)0x9u
 
-#define HTTP_METHOD_MASK             (0x7u << HTTP_METHOD_SHIFT)
-#define HTTP_TRANSFER_ENCODING_MASK  (0x1u << HTTP_TRANSFER_ENCODING_SHIFT)
-#define HTTP_CONTENT_ENCODING_MASK   (0x3u << HTTP_CONTENT_ENCODING_SHIFT)
-#define HTTP_ACCEPT_ENCODING_MASK    (0x7u << HTTP_ACCEPT_ENCODING_SHIFT)
-#define HTTP_CONNECTION_MASK         (0x1u << HTTP_CONNECTION_SHIFT)
+#define HTTP_METHOD_MASK                                                       \
+    (uint16_t)(0x7u << HTTP_METHOD_SHIFT)
+#define HTTP_TRANSFER_ENCODING_MASK                                            \
+    (uint16_t)(0x1u << HTTP_TRANSFER_ENCODING_SHIFT)
+#define HTTP_CONTENT_ENCODING_MASK                                             \
+    (uint16_t)(0x3u << HTTP_CONTENT_ENCODING_SHIFT)
+#define HTTP_ACCEPT_ENCODING_MASK                                              \
+    (uint16_t)(0x7u << HTTP_ACCEPT_ENCODING_SHIFT)
+#define HTTP_CONNECTION_MASK                                                   \
+    (uint16_t)(0x1u << HTTP_CONNECTION_SHIFT)
 
 typedef enum http_request_method {
     HTTP_METHOD_NONE    = 0x0u << HTTP_METHOD_SHIFT,
@@ -52,12 +57,19 @@ typedef enum http_connection_type {
     HTTP_CONNECTION_KEEPALIVE = 0x1u << HTTP_CONNECTION_SHIFT
 } http_connection_type_t;
 
+typedef enum http_connection_state {
+    HTTP_CONNECTION_READING_URI,
+    HTTP_CONNECTION_READING_HEADERS,
+    HTTP_CONNECTION_READING_BODY,
+    HTTP_CONNECTION_SENDING_RESPONSE
+} http_connection_state_t;
+
 /**
  * Request headers struct
  */
 typedef struct http_request_headers {
     char* uri;
-    int64_t content_length;
+    uint64_t content_length;
     char* range;
 
     /**
@@ -70,7 +82,9 @@ typedef struct http_request_headers {
     uint16_t flags;
 } http_request_headers_t;
 
-int32_t http_handle_request(char* buffer, int32_t size);
+int32_t http_handle_uri(http_request_headers_t* request_headers,
+                        socket_fd_t socket_fd,
+                        char* const* buffer_ptr, int32_t* buffer_size);
 
 int32_t http_send_default_response(socket_fd_t socket_fd,
                                    char* buffer, int32_t buffer_size,

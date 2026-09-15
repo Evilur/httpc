@@ -2,6 +2,7 @@
 #include "arg_handler.h"
 #include "error.h"
 #include "event_loop.h"
+#include "http.h"
 #include "null.h"
 #include "server.h"
 #include "socket.h"
@@ -78,7 +79,13 @@ int32_t main(const int32_t argc, const char* const* const argv) {
 
                 /* Fill the parameters of a new connection */
                 new_connection->socket_fd = client_fd;
-                new_connection->buffer_offset = 0;
+                new_connection->buffer_filled = 0;
+                new_connection->request_headers = (http_request_headers_t) {
+                    .uri = null,
+                    .range = null,
+                    .flags = 0
+                };
+                new_connection->state = HTTP_CONNECTION_READING_URI;
 
                 /* Register the client fd in the event loop */
                 if (event_loop_register_event(&event_loop, READY_READ,
@@ -93,8 +100,7 @@ int32_t main(const int32_t argc, const char* const* const argv) {
             else {
                 /* Get the buffer */
                 char* const buffer = connection->buffer;
-                const int32_t buffer_size = sizeof(connection->buffer);
-                int32_t* buffer_offset = &connection->buffer_offset;
+                int32_t* const buffer_filled = &connection->buffer_filled;
 
                 /* Try to receive the request
                  * If the client has closed the connection (1 code)
@@ -103,14 +109,29 @@ int32_t main(const int32_t argc, const char* const* const argv) {
                  * And free the connection
                  */
                 if (server_receive_request(socket_fd, buffer,
-                                           buffer_size, buffer_offset) != 0) {
+                                           sizeof(connection->buffer),
+                                           buffer_filled) != 0) {
                     socket_close(socket_fd);
                     event_loop_remove_event(&event_loop, socket_fd);
                     free(connection);
                     continue;
                 }
 
+                /* Get the request headers and the connection state */
+                http_request_headers_t* const request_headers =
+                    &connection->request_headers;
+                http_connection_state_t* const connection_state =
+                    &connection->state;
+
+                /* Create the buffer_ptr and buffer_size for reading */
+                char* buffer_ptr = buffer;
+                int32_t buffer_size = *buffer_filled;
+
                 /* Try to handle the request */
+                if (connection_state == HTTP_CONNECTION_READING_URI &&
+                    http_handle_uri(request_headers, socket_fd,
+                                    &buffer_ptr, &buffer_size))
+                    ++*connection_state;
             }
         }
     }

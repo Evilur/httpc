@@ -19,17 +19,20 @@ int32_t server_accept_connection(const socket_fd_t server_fd,
 
 int32_t server_receive_request(socket_fd_t client_fd, char* const buffer,
                                const int32_t buffer_size,
-                               int32_t* const buffer_offset) {
+                               int32_t* const buffer_filled) {
     /* Recieve a request */
-    *buffer_offset += socket_receive(client_fd,
-                                     buffer + *buffer_offset,
-                                     buffer_size - *buffer_offset);
+    const int32_t received_size = socket_receive(client_fd,
+                                                 buffer + *buffer_filled,
+                                                 buffer_size - *buffer_filled);
 
     /* If the connection has been closed */
-    if (*buffer_offset == 0) return 1;
+    if (received_size == 0) return 1;
 
     /* If there is an error */
-    if (*buffer_offset == -1) return -1;
+    if (received_size == -1) return -1;
+
+    /* Update the buffer_filled variable */
+    *buffer_filled += received_size;
 
     /* Return a success code */
     return 0;

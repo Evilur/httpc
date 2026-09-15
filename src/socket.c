@@ -66,6 +66,34 @@ int32_t socket_receive(const socket_fd_t socket_fd,
     return received_size;
 }
 
+int32_t socket_write(const socket_fd_t socket_fd,
+                     const char* buffer, int32_t buffer_size) {
+    /* Write all the data from the buffer */
+    int32_t result = 0;
+    while (buffer_size > 0) {
+        /* Try to write the data to the buffer */
+        const int32_t writed_size =
+            (int32_t)write(socket_fd, buffer, (uint64_t)buffer_size);
+
+        /* If the socket is closed */
+        if (writed_size == 0) return 1;
+
+        /* If there is an error somewhere */
+        if (writed_size == -1) {
+            printerr("Failed to write the data to the socket");
+            return -1;
+        }
+
+        /* Update the data */
+        buffer += writed_size;
+        buffer_size -= writed_size;
+        result += writed_size;
+    }
+
+    /* Return the result */
+    return result;
+}
+
 void socket_close(const socket_fd_t socket_fd) {
     close(socket_fd);
 }

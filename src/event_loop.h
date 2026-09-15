@@ -2,6 +2,7 @@
 #define EVENT_LOOP_H
 
 #include "../properties.h"
+#include "http.h"
 #include "socket.h"
 
 #include <stdint.h>
@@ -10,7 +11,7 @@
 typedef int32_t epoll_fd_t;
 typedef struct epoll_event epoll_event_t;
 
-typedef enum {
+typedef enum connection_type {
     CONNECTION_SERVER,
     CONNECTION_CLIENT
 } connection_type_t;
@@ -30,7 +31,9 @@ typedef struct connection {
     connection_type_t type;
     socket_fd_t socket_fd;
     char buffer[MAX_BUFFER_SIZE];
-    int32_t buffer_offset;
+    int32_t buffer_filled;
+    http_request_headers_t request_headers;
+    http_connection_state_t state;
 } connection_t;
 
 /**

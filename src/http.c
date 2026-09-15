@@ -1,11 +1,40 @@
+#include "../properties.h"
 #include "http.h"
 #include "error.h"
+#include "null.h"
 
 #include <stdio.h>
 #include <string.h>
 
-int32_t http_handle_request(char* buffer, int32_t size) {
-    return *buffer + size;
+int32_t http_handle_uri(http_request_headers_t* const request_headers,
+                        const socket_fd_t socket_fd,
+                        char* const* const buffer_ptr,
+                        int32_t* const buffer_size) {
+    /* Try to get the new line sequence */
+    const char* const next_line = strstr(*buffer_ptr, "\r\n");
+
+    /* If there is not a full string in the buffer */
+    if (next_line == null) {
+        /* If the buffer is full already */
+        if (*buffer_size >= MAX_BUFFER_SIZE)
+            /* If we have not even a uri yet */
+            if (request_headers->uri == null) {
+                http_send_default_response(
+                    socket_fd, *buffer_ptr, *buffer_size,
+                    414, "URI Too Long"
+                );
+                return -1;
+            }
+
+        /* If the buffer still writable */
+        return 1;
+    }
+
+    /* If there is a uri string in the buffer */
+
+    /* If we successfully handled the uri,
+     * Return the success code */
+    return 0;
 }
 
 int32_t http_send_default_response(const socket_fd_t socket_fd,
@@ -76,7 +105,7 @@ int32_t http_send_default_response(const socket_fd_t socket_fd,
 http_request_method_t http_get_request_method(
     const http_request_headers_t* const request_headers
 ) {
-    return request_headers->flags & HTTP_METHOD_MASK;
+    return request_headers->flags & (uint16_t)HTTP_METHOD_MASK;
 }
 
 void http_set_request_method(
@@ -84,14 +113,14 @@ void http_set_request_method(
     const http_request_method_t request_method
 ) {
     request_headers->flags =
-        (request_headers->flags & ~HTTP_METHOD_MASK) |
-        (request_method & HTTP_METHOD_MASK);
+        (request_headers->flags & (uint16_t)~HTTP_METHOD_MASK) |
+        (request_method & (uint16_t)HTTP_METHOD_MASK);
 }
 
 http_transfer_encoding_t http_get_transfer_encoding(
     const http_request_headers_t* const request_headers
 ) {
-    return request_headers->flags & HTTP_TRANSFER_ENCODING_MASK;
+    return request_headers->flags & (uint16_t)HTTP_TRANSFER_ENCODING_MASK;
 }
 
 void http_set_transfer_encoding(
@@ -99,14 +128,14 @@ void http_set_transfer_encoding(
     const http_transfer_encoding_t transfer_encoding
 ) {
     request_headers->flags =
-        (request_headers->flags & ~HTTP_TRANSFER_ENCODING_MASK) |
-        (transfer_encoding & HTTP_TRANSFER_ENCODING_MASK);
+        (request_headers->flags & (uint16_t)~HTTP_TRANSFER_ENCODING_MASK) |
+        (transfer_encoding & (uint16_t)HTTP_TRANSFER_ENCODING_MASK);
 }
 
 http_content_encoding_t http_get_content_encoding(
     const http_request_headers_t* const request_headers
 ) {
-    return request_headers->flags & HTTP_CONTENT_ENCODING_MASK;
+    return request_headers->flags & (uint16_t)HTTP_CONTENT_ENCODING_MASK;
 }
 
 void http_set_content_encoding(
@@ -114,14 +143,14 @@ void http_set_content_encoding(
     const http_content_encoding_t content_encoding
 ) {
     request_headers->flags =
-        (request_headers->flags & ~HTTP_CONTENT_ENCODING_MASK) |
-        (content_encoding & HTTP_CONTENT_ENCODING_MASK);
+        (request_headers->flags & (uint16_t)~HTTP_CONTENT_ENCODING_MASK) |
+        (content_encoding & (uint16_t)HTTP_CONTENT_ENCODING_MASK);
 }
 
 http_connection_type_t http_get_connection_type(
     const http_request_headers_t* const request_headers
 ) {
-    return request_headers->flags & HTTP_CONNECTION_MASK;
+    return request_headers->flags & (uint16_t)HTTP_CONNECTION_MASK;
 }
 
 void http_set_connection_type(
@@ -129,7 +158,7 @@ void http_set_connection_type(
     const http_connection_type_t connection_type
 ) {
     request_headers->flags =
-        (request_headers->flags & ~HTTP_CONNECTION_MASK) |
+        (request_headers->flags & (uint16_t)~HTTP_CONNECTION_MASK) |
         (connection_type & HTTP_CONNECTION_MASK);
 }
 
@@ -137,7 +166,7 @@ bool_t http_is_client_support_encoding(
     const http_request_headers_t* const request_headers,
     const http_accept_encoding_t accept_encoding
 ) {
-    return (request_headers->flags & accept_encoding) != 0;
+    return (request_headers->flags & (uint16_t)accept_encoding) != 0;
 }
 
 void http_set_client_supported_encoding(
@@ -146,13 +175,13 @@ void http_set_client_supported_encoding(
     const bool_t value
 ) {
     if (value)
-        request_headers->flags |= accept_encoding;
+        request_headers->flags |= (uint16_t)accept_encoding;
     else
-        request_headers->flags &= ~accept_encoding;
+        request_headers->flags &= (uint16_t)~accept_encoding;
 }
 
 void http_reset_client_supported_encoding(
     http_request_headers_t* const request_headers
 ) {
-    request_headers->flags &= ~HTTP_ACCEPT_ENCODING_MASK;
+    request_headers->flags &= (uint16_t)~HTTP_ACCEPT_ENCODING_MASK;
 }

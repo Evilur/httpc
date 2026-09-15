@@ -16,6 +16,9 @@ int32_t socket_listen(socket_fd_t socket_fd);
 int32_t socket_receive(socket_fd_t socket_fd,
                        char* buffer, int32_t buffer_size);
 
+int32_t socket_write(socket_fd_t socket_fd,
+                     const char* buffer, int32_t buffer_size);
+
 void socket_close(socket_fd_t socket_fd);
 
 #endif
