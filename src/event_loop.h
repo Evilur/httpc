@@ -11,16 +11,10 @@
 typedef int32_t epoll_fd_t;
 typedef struct epoll_event epoll_event_t;
 
-typedef enum connection_type {
-    CONNECTION_SERVER,
-    CONNECTION_CLIENT
-} connection_type_t;
-
 /**
  * Server connection struct
  */
 typedef struct server_connection {
-    connection_type_t type;
     socket_fd_t socket_fd;
 } server_connection_t;
 
@@ -28,7 +22,6 @@ typedef struct server_connection {
  * Client connection struct
  */
 typedef struct connection {
-    connection_type_t type;
     socket_fd_t socket_fd;
     char buffer[MAX_BUFFER_SIZE];
     int32_t buffer_filled;

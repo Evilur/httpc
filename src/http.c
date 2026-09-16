@@ -7,28 +7,66 @@
 #include <stdio.h>
 #include <string.h>
 
-int32_t http_handle_uri(http_request_headers_t* const request_headers,
-                        const socket_fd_t socket_fd,
-                        char** const buffer_ptr,
-                        int32_t* const buffer_size) {
-    /* Create a conts buffer pointer */
+hashmap_t http_supported_headers_map;
+
+int32_t http_init(void) {
+    /* Set supported headers */
+    static char supported_headers[][24] = {
+        "Accept-Encoding",
+        "Connection",
+        "Content-Encoding",
+        "Content-Length",
+        "Expect",
+        "Range",
+        "Transfer-Encoding"
+    };
+    const int32_t supported_headers_size =
+        sizeof(supported_headers) / sizeof(supported_headers[0]);
+
+    /* Save supported request headers */
+    if (hashmap_create(&http_supported_headers_map,
+                       supported_headers_size) == -1)
+        return -1;
+    for (int32_t i = 0; i < supported_headers_size; ++i) {
+        /* Cast the header to lower case */
+        util_tolower(supported_headers[i]);
+
+        /* Save the header */
+        if (hashmap_put(&http_supported_headers_map,
+                        supported_headers[i],
+                        (int32_t)strlen(supported_headers[i]),
+                        (hashmap_element_t){ .int32 = i }) == -1) {
+            printerr("Failed to put the supported headers to the hashmap");
+            return -1;
+        }
+    }
+
+    /* Return the success code */
+    return 0;
+}
+
+int32_t http_handle_request_uri(http_request_headers_t* const request_headers,
+                                const socket_fd_t socket_fd,
+                                char** const buffer_ptr,
+                                int32_t* const buffer_size) {
+    /* Save a const buffer pointer and a size */
     char* const buffer = *buffer_ptr;
+    const int32_t buffer_origin_size = *buffer_size;
 
     /* Try to get the new line sequence */
-    const char* const next_line = util_memmem(buffer, *buffer_size, "\r\n", 2);
+    char* const end_of_line =
+        util_memmem(buffer, buffer_origin_size, "\r\n", 2);
 
     /* If there is not a full string in the buffer */
-    if (next_line == null) {
+    if (end_of_line == null) {
         /* If the buffer is full already */
-        if (*buffer_size >= MAX_BUFFER_SIZE)
-            /* If we have not even a uri yet */
-            if (request_headers->uri == null) {
-                http_send_default_response(
-                    socket_fd, buffer, *buffer_size,
-                    414, "URI Too Long"
-                );
-                return -1;
-            }
+        if (*buffer_size >= MAX_BUFFER_SIZE) {
+            http_send_default_response(
+                socket_fd, buffer, buffer_origin_size,
+                414, "URI Too Long"
+            );
+            return -1;
+        }
 
         /* If the buffer still writable */
         return 1;
@@ -123,7 +161,8 @@ int32_t http_handle_uri(http_request_headers_t* const request_headers,
 
             /* If there is an invalid uri */
             if (high == -1 || low == -1) {
-                http_send_default_response(socket_fd, buffer, *buffer_size,
+                http_send_default_response(socket_fd, buffer,
+                                           buffer_origin_size,
                                            400, "Bad Request");
                 return -1;
             }
@@ -140,11 +179,113 @@ int32_t http_handle_uri(http_request_headers_t* const request_headers,
         }
     }
 
-    /* Set the terminate character */
+    /* Set the uri terminate character */
     *dest_ptr = '\0';
 
-    /* If we successfully handled the uri,
-     * Return the success code */
+    /* Update the buffer size and the pointer to handle headers next */
+    *buffer_ptr = end_of_line + 2;
+    *buffer_size -= (int32_t)(*buffer_ptr - buffer);
+
+    /* Return the success code */
+    return 0;
+}
+
+int32_t http_handle_request_headers(
+    http_request_headers_t* const request_headers,
+    const socket_fd_t socket_fd,
+    char** const buffer_ptr,
+    int32_t* const buffer_size
+) {
+    /* Save a const buffer pointer and a size */
+    char* const buffer = *buffer_ptr;
+    const int32_t buffer_origin_size = *buffer_size;
+
+    /* Get the end of a buffer */
+    const char* const buffer_end = buffer + buffer_origin_size;
+
+    /* While there is not a '\r\n\r\n' sequence */
+    do {
+        /* Try to find the next end of line sequence */
+        char* const end_of_line =
+            util_memmem(*buffer_ptr, *buffer_size, "\r\n", 2);
+
+        /* If there is not a full string in the buffer */
+        if (end_of_line == null) {
+            /* If the buffer is full already */
+            if (*buffer_size >= MAX_BUFFER_SIZE) {
+                http_send_default_response(
+                    socket_fd, buffer, buffer_origin_size,
+                    431, "Request Header Fields Too Large"
+                );
+                return -1;
+            }
+
+            /* If the buffer still writable */
+            return 1;
+        }
+
+        /* If there is a full string in the buffer,
+         * Get the header name */
+        char* const end_of_header_name =
+            memchr(*buffer_ptr, ':', (uint64_t)(end_of_line - *buffer_ptr));
+        if (end_of_header_name == null) {
+            http_send_default_response(
+                socket_fd, buffer, buffer_origin_size,
+                400, "Bad Request"
+            );
+            return -1;
+        }
+        *end_of_header_name = '\0';
+
+        /* Try to find the header name in the hashmap of the supported */
+        util_tolower(*buffer_ptr);
+        const hashmap_element_t* const header =
+            hashmap_get(&http_supported_headers_map,
+                        *buffer_ptr,
+                        (int32_t)(end_of_header_name - *buffer_ptr));
+
+        /* If the header in the list of the supported */
+        if (header != null) {
+            *buffer_ptr = end_of_header_name + 1;
+            switch (header->int32) {
+                case HTTP_SUPPORTED_ACCEPT_ENCODING:
+                    printf("Accept-Encoding\n");
+                    break;
+
+                case HTTP_SUPPORTED_CONNECTION:
+                    printf("Connection\n");
+                    http_set_connection_type(request_headers,
+                                             HTTP_CONNECTION_CLOSE);
+                    break;
+
+                case HTTP_SUPPORTED_CONTENT_ENCODING:
+                    printf("Content-Encoding\n");
+                    break;
+
+                case HTTP_SUPPORTED_CONTENT_LENGTH:
+                    printf("Content-Length\n");
+                    break;
+
+                case HTTP_SUPPORTED_EXPECT:
+                    printf("Expect\n");
+                    break;
+
+                case HTTP_SUPPORTED_RANGE:
+                    printf("Range\n");
+                    break;
+
+                case HTTP_SUPPORTED_TRANSFER_ENCODING:
+                    printf("Transfer-Encoding\n");
+                    break;
+            }
+        }
+
+        /* Update the buffer pointer and the size */
+        *buffer_ptr = end_of_line + 2;
+        *buffer_size = (int32_t)(buffer_end - *buffer_ptr);
+    } while (memcmp(*buffer_ptr, "\r\n", 2) != 0);
+
+    /* Return success code */
     return 0;
 }
 
@@ -256,6 +397,21 @@ void http_set_content_encoding(
     request_headers->flags =
         (request_headers->flags & (uint16_t)~HTTP_CONTENT_ENCODING_MASK) |
         (content_encoding & (uint16_t)HTTP_CONTENT_ENCODING_MASK);
+}
+
+http_expect_t http_get_expect(
+    const http_request_headers_t* const request_headers
+) {
+    return request_headers->flags & (uint16_t)HTTP_EXPECT_MASK;
+}
+
+void http_set_expect(
+    http_request_headers_t* request_headers,
+    http_expect_t expect
+) {
+    request_headers->flags =
+        (request_headers->flags & (uint16_t)~HTTP_EXPECT_MASK) |
+        (expect & HTTP_EXPECT_MASK);
 }
 
 http_connection_type_t http_get_connection_type(

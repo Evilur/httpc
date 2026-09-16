@@ -5,20 +5,25 @@
 
 char* util_memmem(const char* buffer, const int32_t buffer_size,
                   const char* const pattern, const int32_t pattern_size) {
-    /* Get the last possible pointer */
-    const char* const buffer_end = buffer + (buffer_size - pattern_size);
-
     /* Try to find the pattern */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-qual"
-    while (buffer < buffer_end)
+    for (const char* const buffer_end = buffer + (buffer_size - pattern_size);
+         buffer < buffer_end; ++buffer)
         if (memcmp(buffer, pattern, (uint64_t)pattern_size) == 0)
             return (char*)buffer;
-        else ++buffer;
 #pragma GCC diagnostic pop
 
     /* If there is no pattern in the buffer */
     return null;
+}
+
+void util_tolower(char* string) {
+    while (*string != '\0') {
+        if (*string >= 'A' && *string <= 'Z')
+            *string += (unsigned char)('a' - 'A');
+        ++string;
+    }
 }
 
 int32_t util_hexval(unsigned char chr) {

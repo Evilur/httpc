@@ -60,7 +60,7 @@ int32_t socket_receive(const socket_fd_t socket_fd,
 
     /* If there is an error */
     if (received_size == -1)
-        printerr("Failed to receive a data by socket");
+        printerr("Failed to receive a data by the socket");
 
     /* Return the received data size */
     return received_size;

@@ -7,7 +7,7 @@
 
 int32_t hashmap_create(hashmap_t* const hashmap, int32_t capacity) {
     /* Increase the capacity */
-    capacity = (int32_t)((float)capacity * 1.65f);
+    capacity = (int32_t)((float)capacity * 1.75f);
 
     /* Init the hashmap */
     *hashmap = (hashmap_t) {
@@ -49,7 +49,7 @@ int32_t hashmap_put(hashmap_t* const hashmap,
     memcpy(key_clone, key, (uint64_t)key_size);
 
     /* If the cell is empty */
-    if (nodes[index].hash != 0) {
+    if (nodes[index].hash == 0) {
         /* Just write the data there */
         nodes[index] = (hashmap_node_t) {
             .hash = hash,
@@ -69,7 +69,7 @@ int32_t hashmap_put(hashmap_t* const hashmap,
          node_ptr < node_end;
          ++node_ptr) {
         /* If we found an empty cell */
-        if (node_ptr->hash != 0) {
+        if (node_ptr->hash == 0) {
             /* Write the data to the empty cell */
             *node_ptr = (hashmap_node_t) {
                 .hash = hash,
@@ -87,7 +87,7 @@ int32_t hashmap_put(hashmap_t* const hashmap,
          node_ptr < node_end;
          ++node_ptr) {
         /* If we found an empty cell */
-        if (node_ptr->hash != 0) {
+        if (node_ptr->hash == 0) {
             /* Write the data to the empty cell */
             *node_ptr = (hashmap_node_t) {
                 .hash = hash,
@@ -117,15 +117,13 @@ hashmap_element_t* hashmap_get(hashmap_t* const hashmap,
     /* Get the nodes */
     hashmap_node_t* nodes = hashmap->nodes;
 
-    /* If the cell is not empty */
-    if (nodes[index].hash == 0) {
-        /* Compare the hash and the key */
-        hashmap_node_t* const node = nodes + index;
-        if (node->hash == hash &&
-            node->key_size == key_size &&
-            memcmp(node->key, key, (uint64_t)key_size))
-            return &node->data;
-    }
+    /* Compare the hash and the key */
+    hashmap_node_t* const node = nodes + index;
+    if (node->hash == 0) return null;
+    if (node->hash == hash &&
+        node->key_size == key_size &&
+        memcmp(node->key, key, (uint64_t)key_size) == 0)
+        return &node->data;
 
     /* If the element is not in its index cell
      * Loop through the nodes to find the first element */
@@ -134,9 +132,10 @@ hashmap_element_t* hashmap_get(hashmap_t* const hashmap,
          node_ptr < node_end;
          ++node_ptr) {
         /* Compare the hash and the key */
+        if (node_ptr->hash == 0) return null;
         if (node_ptr->hash == hash &&
             node_ptr->key_size == key_size &&
-            memcmp(node_ptr->key, key, (uint64_t)key_size))
+            memcmp(node_ptr->key, key, (uint64_t)key_size) == 0)
             return &node_ptr->data;
     }
     for (hashmap_node_t* node_ptr = nodes,
@@ -144,9 +143,10 @@ hashmap_element_t* hashmap_get(hashmap_t* const hashmap,
          node_ptr < node_end;
          ++node_ptr) {
         /* Compare the hash and the key */
+        if (node_ptr->hash == 0) return null;
         if (node_ptr->hash == hash &&
             node_ptr->key_size == key_size &&
-            memcmp(node_ptr->key, key, (uint64_t)key_size))
+            memcmp(node_ptr->key, key, (uint64_t)key_size) == 0)
             return &node_ptr->data;
     }
 

@@ -30,11 +30,11 @@ int32_t main(const int32_t argc, const char* const* const argv) {
         return -1;
     printf("Start listening on http://0.0.0.0:%hu\n", port);
 
+    /* Try to init the http handler */
+    if (http_init() == -1) return -1;
+
     /* Create a connection structure */
-    server_connection_t server_connection = {
-        .type = CONNECTION_SERVER,
-        .socket_fd = server_fd
-    };
+    server_connection_t server_connection = { .socket_fd = server_fd };
 
     /* Init the event loop and register the server event */
     event_loop_t event_loop;
@@ -129,9 +129,18 @@ int32_t main(const int32_t argc, const char* const* const argv) {
 
                 /* Try to handle the request */
                 if (*connection_state == HTTP_CONNECTION_READING_URI &&
-                    http_handle_uri(request_headers, socket_fd,
-                                    &buffer_ptr, &buffer_size) == 0)
+                    http_handle_request_uri(
+                        request_headers, socket_fd, &buffer_ptr, &buffer_size
+                    ) == 0)
                     ++*connection_state;
+                if (*connection_state == HTTP_CONNECTION_READING_HEADERS &&
+                    http_handle_request_headers(
+                        request_headers, socket_fd, &buffer_ptr, &buffer_size
+                    ) == 0)
+                    ++*connection_state;
+
+                http_send_default_response(socket_fd, buffer, *buffer_filled,
+                                           200, "Hello World!");
             }
         }
     }
