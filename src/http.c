@@ -1,5 +1,6 @@
 #include "../properties.h"
 #include "http.h"
+#include "ctrie.h"
 #include "error.h"
 #include "null.h"
 #include "util.h"
@@ -7,39 +8,25 @@
 #include <stdio.h>
 #include <string.h>
 
-hashmap_t http_supported_headers_map;
+ctrie_node_t http_supported_headers_ctrie;
 
 int32_t http_init(void) {
     /* Set supported headers */
-    static char supported_headers[][24] = {
-        "Accept-Encoding",
-        "Connection",
-        "Content-Encoding",
-        "Content-Length",
-        "Expect",
-        "Range",
-        "Transfer-Encoding"
+    ctrie_key_value_t supported_headers[] = {
+        { "content-length",    { HTTP_SUPPORTED_CONTENT_LENGTH } },
+        { "connection",        { HTTP_SUPPORTED_CONNECTION } },
+        { "accept-encoding",   { HTTP_SUPPORTED_ACCEPT_ENCODING } },
+        { "content-encoding",  { HTTP_SUPPORTED_CONTENT_ENCODING } },
+        { "transfer-encoding", { HTTP_SUPPORTED_TRANSFER_ENCODING } },
+        { "expect",            { HTTP_SUPPORTED_EXPECT } },
+        { "range",             { HTTP_SUPPORTED_RANGE } },
     };
     const int32_t supported_headers_size =
-        sizeof(supported_headers) / sizeof(supported_headers[0]);
+        sizeof(supported_headers) / sizeof(ctrie_key_value_t);
 
-    /* Save supported request headers */
-    if (hashmap_create(&http_supported_headers_map,
-                       supported_headers_size) == -1)
-        return -1;
-    for (int32_t i = 0; i < supported_headers_size; ++i) {
-        /* Cast the header to lower case */
-        util_tolower(supported_headers[i]);
-
-        /* Save the header */
-        if (hashmap_put(&http_supported_headers_map,
-                        supported_headers[i],
-                        (int32_t)strlen(supported_headers[i]),
-                        (hashmap_element_t){ .int32 = i }) == -1) {
-            printerr("Failed to put the supported headers to the hashmap");
-            return -1;
-        }
-    }
+    ctrie_create(&http_supported_headers_ctrie,
+                 supported_headers,
+                 supported_headers_size);
 
     /* Return the success code */
     return 0;
@@ -237,15 +224,16 @@ int32_t http_handle_request_headers(
         }
         *end_of_header_name = '\0';
 
+        request_headers->content_length = 1;
         /* Try to find the header name in the hashmap of the supported */
-        util_tolower(*buffer_ptr);
+        /*util_tolower(*buffer_ptr);
         const hashmap_element_t* const header =
             hashmap_get(&http_supported_headers_map,
                         *buffer_ptr,
-                        (int32_t)(end_of_header_name - *buffer_ptr));
+                        (int32_t)(end_of_header_name - *buffer_ptr)); */
 
         /* If the header in the list of the supported */
-        if (header != null) {
+        /*if (header != null) {
             *buffer_ptr = end_of_header_name + 1;
             switch (header->int32) {
                 case HTTP_SUPPORTED_ACCEPT_ENCODING:
@@ -278,7 +266,7 @@ int32_t http_handle_request_headers(
                     printf("Transfer-Encoding\n");
                     break;
             }
-        }
+        }*/
 
         /* Update the buffer pointer and the size */
         *buffer_ptr = end_of_line + 2;

@@ -2,6 +2,7 @@
 #define HTTP_H
 
 #include "bool.h"
+#include "ctrie.h"
 #include "hashmap.h"
 #include "socket.h"
 
@@ -102,7 +103,7 @@ typedef enum http_supported_headers {
     HTTP_SUPPORTED_TRANSFER_ENCODING
 } http_supported_headers_t;
 
-extern hashmap_t http_supported_headers_map;
+extern ctrie_node_t http_supported_headers_ctrie;
 
 int32_t http_init(void);
 
