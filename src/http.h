@@ -3,20 +3,19 @@
 
 #include "bool.h"
 #include "ctrie.h"
-#include "hashmap.h"
 #include "socket.h"
 
 #include <stdint.h>
 
 #define HTTP_METHOD_SHIFT             (uint16_t)0x0u
-#define HTTP_TRANSFER_ENCODING_SHIFT  (uint16_t)0x3u
-#define HTTP_CONTENT_ENCODING_SHIFT   (uint16_t)0x4u
-#define HTTP_ACCEPT_ENCODING_SHIFT    (uint16_t)0x6u
-#define HTTP_EXPECT_SHIFT             (uint16_t)0x9u
-#define HTTP_CONNECTION_SHIFT         (uint16_t)0xau
+#define HTTP_TRANSFER_ENCODING_SHIFT  (uint16_t)0x2u
+#define HTTP_CONTENT_ENCODING_SHIFT   (uint16_t)0x3u
+#define HTTP_ACCEPT_ENCODING_SHIFT    (uint16_t)0x5u
+#define HTTP_EXPECT_SHIFT             (uint16_t)0x8u
+#define HTTP_CONNECTION_SHIFT         (uint16_t)0x9u
 
 #define HTTP_METHOD_MASK                                                       \
-    (uint16_t)(0x7u << HTTP_METHOD_SHIFT)
+    (uint16_t)(0x3u << HTTP_METHOD_SHIFT)
 #define HTTP_TRANSFER_ENCODING_MASK                                            \
     (uint16_t)(0x1u << HTTP_TRANSFER_ENCODING_SHIFT)
 #define HTTP_CONTENT_ENCODING_MASK                                             \
@@ -32,11 +31,7 @@ typedef enum http_request_method {
     HTTP_METHOD_NONE    = 0x0u << HTTP_METHOD_SHIFT,
     HTTP_METHOD_GET     = 0x1u << HTTP_METHOD_SHIFT,
     HTTP_METHOD_HEAD    = 0x2u << HTTP_METHOD_SHIFT,
-    HTTP_METHOD_POST    = 0x3u << HTTP_METHOD_SHIFT,
-    HTTP_METHOD_PUT     = 0x4u << HTTP_METHOD_SHIFT,
-    HTTP_METHOD_PATCH   = 0x5u << HTTP_METHOD_SHIFT,
-    HTTP_METHOD_DELETE  = 0x6u << HTTP_METHOD_SHIFT,
-    HTTP_METHOD_OPTIONS = 0x7u << HTTP_METHOD_SHIFT
+    HTTP_METHOD_POST    = 0x3u << HTTP_METHOD_SHIFT
 } http_request_method_t;
 
 typedef enum http_transfer_encoding {

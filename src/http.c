@@ -17,10 +17,6 @@ int32_t http_init(void) {
         { "GET",     { HTTP_METHOD_GET } },
         { "HEAD",    { HTTP_METHOD_HEAD } },
         { "POST",    { HTTP_METHOD_POST } },
-        { "PUT",     { HTTP_METHOD_PUT } },
-        { "PATCH",   { HTTP_METHOD_PATCH } },
-        { "DELETE",  { HTTP_METHOD_DELETE } },
-        { "OPTIONS", { HTTP_METHOD_OPTIONS } }
     };
     const int32_t supported_methods_size =
         sizeof(supported_methods) / sizeof(ctrie_key_value_t);
