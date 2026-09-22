@@ -103,7 +103,8 @@ typedef enum http_supported_headers {
     HTTP_SUPPORTED_TRANSFER_ENCODING
 } http_supported_headers_t;
 
-extern ctrie_node_t http_supported_headers_ctrie;
+extern ctrie_t http_supported_methods_ctrie;
+extern ctrie_t http_supported_headers_ctrie;
 
 int32_t http_init(void);
 

@@ -10,7 +10,7 @@ static int32_t ctrie_compare_keys(const void* pair1, const void* pair2);
 
 static int32_t ctrie_longest_common_prefix(const char* str1, const char* str2);
 
-static bool_t ctrie_are_equals(const char** str1, const char* str2, char eol);
+static bool_t ctrie_are_equals(char** const str1, const char* str2, char eol);
 
 int32_t ctrie_create(ctrie_t* const ctrie,
                      ctrie_key_value_t* const key_values,
@@ -317,14 +317,14 @@ static int32_t ctrie_longest_common_prefix(const char* str1, const char* str2) {
 }
 
 ctrie_data_t* ctrie_get(const ctrie_t* const ctrie,
-                        const char* key,
+                        char** const key,
                         const char eol) {
     /* Go throught the tree to find the entry */
     for (ctrie_node_t* nodes_ptr = ctrie->childs,
          * nodes_end = ctrie->childs + ctrie->childs_num;
          nodes_ptr < nodes_end;) {
-        if (ctrie_are_equals(&key, nodes_ptr->label, eol)) {
-            if (nodes_ptr->is_terminal && key[0] == eol)
+        if (ctrie_are_equals(key, nodes_ptr->label, eol)) {
+            if (nodes_ptr->is_terminal && **key == eol)
                 return &nodes_ptr->data;
             if (nodes_ptr->childs_num > 0) {
                 if (nodes_ptr->childs == null) return null;
@@ -341,15 +341,27 @@ ctrie_data_t* ctrie_get(const ctrie_t* const ctrie,
     return null;
 }
 
-static bool_t ctrie_are_equals(const char** str1,
-                               const char* str2,
+static bool_t ctrie_are_equals(char** const str1, const char* str2,
                                const char eol) {
     /* Tempotaty pointer */
-    const char* str1_ptr = *str1;
+    char* str1_ptr = *str1;
 
     /* Loop through strings */
     while (str1_ptr[0] != eol && str1_ptr[0] != '\0' && str2[0] != '\0') {
-        if (str1_ptr[0] != str2[0]) return 0;
+        char c1 = *str1_ptr;
+        char c2 = *str2;
+
+        if (c1 != c2) {
+            /* Invert c1 case */
+            if (c1 >= 'A' && c1 <= 'Z')
+                c1 += 'a' - 'A';
+            else if (c1 >= 'a' && c1 <= 'z')
+                c1 -= 'a' - 'A';
+
+            /* Yet another check */
+            if (c1 != c2) return 0;
+        }
+
         ++str1_ptr;
         ++str2;
     }

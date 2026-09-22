@@ -34,7 +34,7 @@ int32_t ctrie_create(ctrie_t* ctrie,
                      int32_t size);
 
 ctrie_data_t* ctrie_get(const ctrie_t* ctrie,
-                        const char* key,
+                        char** key,
                         char eol);
 
 #endif

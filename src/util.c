@@ -18,17 +18,14 @@ char* util_memmem(const char* buffer, const int32_t buffer_size,
     return null;
 }
 
-void util_tolower(char* string) {
-    while (*string != '\0') {
-        if (*string >= 'A' && *string <= 'Z')
-            *string += (unsigned char)('a' - 'A');
-        ++string;
-    }
-}
-
 int32_t util_hexval(unsigned char chr) {
     if (chr >= '0' && chr <= '9') return chr - '0';
     if (chr >= 'a' && chr <= 'f') return chr - 'a' + 10;
     if (chr >= 'A' && chr <= 'F') return chr - 'A' + 10;
     return -1;
+}
+
+char* util_trim(char* str) {
+    while (*str == ' ') ++str;
+    return str;
 }

@@ -8,25 +8,44 @@
 #include <stdio.h>
 #include <string.h>
 
-ctrie_node_t http_supported_headers_ctrie;
+ctrie_t http_supported_methods_ctrie;
+ctrie_t http_supported_headers_ctrie;
 
 int32_t http_init(void) {
+    /* Set supported methods */
+    ctrie_key_value_t supported_methods[] = {
+        { "GET",     { HTTP_METHOD_GET } },
+        { "HEAD",    { HTTP_METHOD_HEAD } },
+        { "POST",    { HTTP_METHOD_POST } },
+        { "PUT",     { HTTP_METHOD_PUT } },
+        { "PATCH",   { HTTP_METHOD_PATCH } },
+        { "DELETE",  { HTTP_METHOD_DELETE } },
+        { "OPTIONS", { HTTP_METHOD_OPTIONS } }
+    };
+    const int32_t supported_methods_size =
+        sizeof(supported_methods) / sizeof(ctrie_key_value_t);
+
     /* Set supported headers */
     ctrie_key_value_t supported_headers[] = {
-        { "content-length",    { HTTP_SUPPORTED_CONTENT_LENGTH } },
-        { "connection",        { HTTP_SUPPORTED_CONNECTION } },
-        { "accept-encoding",   { HTTP_SUPPORTED_ACCEPT_ENCODING } },
-        { "content-encoding",  { HTTP_SUPPORTED_CONTENT_ENCODING } },
-        { "transfer-encoding", { HTTP_SUPPORTED_TRANSFER_ENCODING } },
-        { "expect",            { HTTP_SUPPORTED_EXPECT } },
-        { "range",             { HTTP_SUPPORTED_RANGE } },
+        { "Content-Length",    { HTTP_SUPPORTED_CONTENT_LENGTH } },
+        { "Connection",        { HTTP_SUPPORTED_CONNECTION } },
+        { "Accept-Encoding",   { HTTP_SUPPORTED_ACCEPT_ENCODING } },
+        { "Content-Encoding",  { HTTP_SUPPORTED_CONTENT_ENCODING } },
+        { "Transfer-Encoding", { HTTP_SUPPORTED_TRANSFER_ENCODING } },
+        { "Expect",            { HTTP_SUPPORTED_EXPECT } },
+        { "Range",             { HTTP_SUPPORTED_RANGE } },
     };
     const int32_t supported_headers_size =
         sizeof(supported_headers) / sizeof(ctrie_key_value_t);
 
-    ctrie_create(&http_supported_headers_ctrie,
-                 supported_headers,
-                 supported_headers_size);
+    /* Create the ctrie and return the code */
+    if (ctrie_create(&http_supported_headers_ctrie,
+                     supported_headers,
+                     supported_headers_size) == -1 ||
+        ctrie_create(&http_supported_methods_ctrie,
+                     supported_methods,
+                     supported_methods_size) == -1)
+        return -1;
 
     /* Return the success code */
     return 0;
@@ -61,81 +80,18 @@ int32_t http_handle_request_uri(http_request_headers_t* const request_headers,
 
     /* If there is a uri string in the buffer,
      * Try to get the request method */
-    switch (*(*buffer_ptr)++) {
-        case 'G':
-            if (memcmp(*buffer_ptr, "ET ", 3) == 0) {
-                http_set_request_method(request_headers, HTTP_METHOD_GET);
-                *buffer_ptr += 3;
-            }
-            else goto invalid_method;
-            break;
-
-        case 'H':
-            if (memcmp(*buffer_ptr, "EAD ", 4) == 0) {
-                http_set_request_method(request_headers, HTTP_METHOD_HEAD);
-                *buffer_ptr += 4;
-            }
-            else goto invalid_method;
-            break;
-
-        case 'P':
-            switch (*(*buffer_ptr)++) {
-                case 'O':
-                    if (memcmp(*buffer_ptr, "ST ", 3) == 0) {
-                        http_set_request_method(request_headers,
-                                                HTTP_METHOD_POST);
-                        *buffer_ptr += 3;
-                    }
-                    else goto invalid_method;
-                    break;
-
-                case 'U':
-                    if (memcmp(*buffer_ptr, "T ", 2) == 0) {
-                        http_set_request_method(request_headers,
-                                                HTTP_METHOD_PUT);
-                        *buffer_ptr += 2;
-                    }
-                    else goto invalid_method;
-                    break;
-
-                case 'A':
-                    if (memcmp(*buffer_ptr, "TCH ", 4) == 0) {
-                        http_set_request_method(request_headers,
-                                                HTTP_METHOD_PATCH);
-                        *buffer_ptr += 4;
-                    }
-                    else goto invalid_method;
-                    break;
-
-                default: goto invalid_method;
-            }
-            break;
-
-        case 'D':
-            if (memcmp(*buffer_ptr, "ELETE ", 6) == 0) {
-                http_set_request_method(request_headers, HTTP_METHOD_DELETE);
-                *buffer_ptr += 6;
-            }
-            else goto invalid_method;
-            break;
-
-        case 'O':
-            if (memcmp(*buffer_ptr, "PTIONS ", 7) == 0) {
-                http_set_request_method(request_headers, HTTP_METHOD_OPTIONS);
-                *buffer_ptr += 7;
-            }
-            else goto invalid_method;
-            break;
-
-        default:
-        invalid_method:
-            http_send_default_response(socket_fd, buffer, *buffer_size,
-                                       501, "Not Implemented");
-            return -1;
+    const ctrie_data_t* const method_ptr =
+        ctrie_get(&http_supported_methods_ctrie, buffer_ptr, ' ');
+    if (method_ptr == null) {
+        http_send_default_response(socket_fd, buffer, *buffer_size,
+                                   501, "Not Implemented");
+        return -1;
     }
+    http_set_request_method(request_headers,
+                            (http_request_method_t)method_ptr->int32);
 
     /* Save the uri */
-    request_headers->uri = *buffer_ptr;
+    request_headers->uri = *buffer_ptr + 1;
 
     /* Unescape the uri in-place */
     char *source_ptr = *buffer_ptr;
@@ -211,31 +167,14 @@ int32_t http_handle_request_headers(
             return 1;
         }
 
-        /* If there is a full string in the buffer,
-         * Get the header name */
-        char* const end_of_header_name =
-            memchr(*buffer_ptr, ':', (uint64_t)(end_of_line - *buffer_ptr));
-        if (end_of_header_name == null) {
-            http_send_default_response(
-                socket_fd, buffer, buffer_origin_size,
-                400, "Bad Request"
-            );
-            return -1;
-        }
-        *end_of_header_name = '\0';
-
-        request_headers->content_length = 1;
-        /* Try to find the header name in the hashmap of the supported */
-        /*util_tolower(*buffer_ptr);
-        const hashmap_element_t* const header =
-            hashmap_get(&http_supported_headers_map,
-                        *buffer_ptr,
-                        (int32_t)(end_of_header_name - *buffer_ptr)); */
+        /* Try to find the header name in the ctrie of the supported */
+        const ctrie_data_t* const header_name =
+            ctrie_get(&http_supported_headers_ctrie, buffer_ptr, ':');
 
         /* If the header in the list of the supported */
-        /*if (header != null) {
-            *buffer_ptr = end_of_header_name + 1;
-            switch (header->int32) {
+        if (header_name != null) {
+            *buffer_ptr = util_trim(*buffer_ptr + 1);
+            switch (header_name->int32) {
                 case HTTP_SUPPORTED_ACCEPT_ENCODING:
                     printf("Accept-Encoding\n");
                     break;
@@ -266,7 +205,7 @@ int32_t http_handle_request_headers(
                     printf("Transfer-Encoding\n");
                     break;
             }
-        }*/
+        }
 
         /* Update the buffer pointer and the size */
         *buffer_ptr = end_of_line + 2;
