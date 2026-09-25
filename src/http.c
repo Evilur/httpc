@@ -6,10 +6,12 @@
 #include "util.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 ctrie_t http_supported_methods_ctrie;
 ctrie_t http_supported_headers_ctrie;
+ctrie_t http_supported_encoding_ctrie;
 
 int32_t http_init(void) {
     /* Set supported methods */
@@ -23,24 +25,35 @@ int32_t http_init(void) {
 
     /* Set supported headers */
     ctrie_key_value_t supported_headers[] = {
-        { "Content-Length",    { HTTP_SUPPORTED_CONTENT_LENGTH } },
-        { "Connection",        { HTTP_SUPPORTED_CONNECTION } },
-        { "Accept-Encoding",   { HTTP_SUPPORTED_ACCEPT_ENCODING } },
-        { "Content-Encoding",  { HTTP_SUPPORTED_CONTENT_ENCODING } },
-        { "Transfer-Encoding", { HTTP_SUPPORTED_TRANSFER_ENCODING } },
-        { "Expect",            { HTTP_SUPPORTED_EXPECT } },
-        { "Range",             { HTTP_SUPPORTED_RANGE } },
+        { "Content-Length",    { HTTP_SUPPORTED_HEADER_CONTENT_LENGTH } },
+        { "Connection",        { HTTP_SUPPORTED_HEADER_CONNECTION } },
+        { "Accept-Encoding",   { HTTP_SUPPORTED_HEADER_ACCEPT_ENCODING } },
+        { "Transfer-Encoding", { HTTP_SUPPORTED_HEADER_TRANSFER_ENCODING } },
+        { "Expect",            { HTTP_SUPPORTED_HEADER_EXPECT } },
+        { "Range",             { HTTP_SUPPORTED_HEADER_RANGE } },
     };
     const int32_t supported_headers_size =
         sizeof(supported_headers) / sizeof(ctrie_key_value_t);
 
-    /* Create the ctrie and return the code */
+    /* Set supported encoding */
+    ctrie_key_value_t supported_encoding[] = {
+        { "zstd", { HTTP_ACCEPT_ENCODING_ZSTD } },
+        { "br",   { HTTP_ACCEPT_ENCODING_BR } },
+        { "gzip", { HTTP_ACCEPT_ENCODING_GZIP } }
+    };
+    const int32_t supported_encoding_size =
+        sizeof(supported_encoding) / sizeof(ctrie_key_value_t);
+
+    /* Create ctries and return the code on error */
     if (ctrie_create(&http_supported_headers_ctrie,
                      supported_headers,
                      supported_headers_size) == -1 ||
         ctrie_create(&http_supported_methods_ctrie,
                      supported_methods,
-                     supported_methods_size) == -1)
+                     supported_methods_size) == -1 ||
+        ctrie_create(&http_supported_encoding_ctrie,
+                     supported_encoding,
+                     supported_encoding_size) == -1)
         return -1;
 
     /* Return the success code */
@@ -83,11 +96,6 @@ int32_t http_handle_request_uri(http_request_headers_t* const request_headers,
                                    501, "Not Implemented");
         return -1;
     }
-    http_set_request_method(request_headers,
-                            (http_request_method_t)method_ptr->int32);
-
-    /* Save the uri */
-    request_headers->uri = *buffer_ptr + 1;
 
     /* Unescape the uri in-place */
     char *source_ptr = *buffer_ptr;
@@ -120,6 +128,12 @@ int32_t http_handle_request_uri(http_request_headers_t* const request_headers,
 
     /* Set the uri terminate character */
     *dest_ptr = '\0';
+
+    /* Copy the uri */
+    const uint64_t uri_length = (uint64_t)(dest_ptr - *buffer_ptr);
+    request_headers->uri = malloc(uri_length + 1);
+    memcpy(request_headers->uri, *buffer_ptr, uri_length);
+    request_headers->uri[uri_length] = '\0';
 
     /* Update the buffer size and the pointer to handle headers next */
     *buffer_ptr = end_of_line + 2;
@@ -161,7 +175,7 @@ int32_t http_handle_request_headers(
 
             /* If the buffer still writable */
             return 1;
-        }
+        } else *end_of_line = '\0';
 
         /* Try to find the header name in the ctrie of the supported */
         const ctrie_data_t* const header_name =
@@ -171,35 +185,88 @@ int32_t http_handle_request_headers(
         if (header_name != null) {
             *buffer_ptr = util_trim(*buffer_ptr + 1);
             switch (header_name->int32) {
-                case HTTP_SUPPORTED_ACCEPT_ENCODING:
-                    printf("Accept-Encoding\n");
+                case HTTP_SUPPORTED_HEADER_ACCEPT_ENCODING:
+                    while (*buffer_ptr < end_of_line) {
+                        /* Try to get the end of the current algo name */
+                        char* const end_of_algo_name =
+                            strpbrk(*buffer_ptr, ",; ");
+                        if (end_of_algo_name == null) break;
+
+                        /* Save the old terminate char and make it \0 */
+                        const char old_end = *end_of_algo_name;
+                        *end_of_algo_name = '\0';
+
+                        /* Add the supported compression type */
+                        const ctrie_data_t* compression_type =
+                            ctrie_get(&http_supported_encoding_ctrie,
+                                      buffer_ptr, '\0');
+                        if (compression_type != null)
+                            http_set_client_supported_encoding(
+                                request_headers,
+                                (http_accept_encoding_t)
+                                compression_type->int32,
+                                1
+                            );
+                        if (compression_type != null)
+                            printf("%d\n", compression_type->int32);
+
+                        /* Go to the next algo name */
+                        switch (old_end) {
+                            case ',':
+                                *buffer_ptr = util_trim(end_of_algo_name + 1);
+                                break;
+                            case ';':
+                                *buffer_ptr = strchr(end_of_algo_name, ',');
+                                if (*buffer_ptr == null)
+                                    goto end_of_accept_encoding;
+                                else *buffer_ptr = util_trim(*buffer_ptr + 1);
+                                break;
+                            default:
+                                goto end_of_accept_encoding;
+                        }
+                    }
+                end_of_accept_encoding:
                     break;
 
-                case HTTP_SUPPORTED_CONNECTION:
-                    printf("Connection\n");
-                    http_set_connection_type(request_headers,
-                                             HTTP_CONNECTION_CLOSE);
+                case HTTP_SUPPORTED_HEADER_CONNECTION:
+                    http_set_connection_type(
+                        request_headers,
+                        util_strcicmp(*buffer_ptr, "keep-alive") ?
+                        HTTP_CONNECTION_KEEPALIVE :
+                        HTTP_CONNECTION_CLOSE);
                     break;
 
-                case HTTP_SUPPORTED_CONTENT_ENCODING:
-                    printf("Content-Encoding\n");
+                case HTTP_SUPPORTED_HEADER_CONTENT_LENGTH:
+                    if (*buffer != '0')
+                        http_send_default_response(
+                            socket_fd, buffer, buffer_origin_size,
+                            400, "Bad Request");
+                    return -1;
+
+                case HTTP_SUPPORTED_HEADER_EXPECT:
+                    http_send_default_response(
+                        socket_fd, buffer, buffer_origin_size,
+                        417, "Expectation Failed");
+                    return -1;
+
+                case HTTP_SUPPORTED_HEADER_RANGE:
+                    if (end_of_line < *buffer_ptr) break;
+                    {
+                        const uint64_t range_str_length =
+                            (uint64_t)(end_of_line - *buffer_ptr);
+                        request_headers->range = malloc(range_str_length + 1);
+                        if (request_headers->range == null) break;
+                        memcpy(request_headers->range, *buffer_ptr,
+                               range_str_length);
+                        request_headers->range[range_str_length] = '\0';
+                    }
                     break;
 
-                case HTTP_SUPPORTED_CONTENT_LENGTH:
-                    printf("Content-Length\n");
-                    break;
-
-                case HTTP_SUPPORTED_EXPECT:
-                    printf("Expect\n");
-                    break;
-
-                case HTTP_SUPPORTED_RANGE:
-                    printf("Range\n");
-                    break;
-
-                case HTTP_SUPPORTED_TRANSFER_ENCODING:
-                    printf("Transfer-Encoding\n");
-                    break;
+                case HTTP_SUPPORTED_HEADER_TRANSFER_ENCODING:
+                    http_send_default_response(
+                        socket_fd, buffer, buffer_origin_size,
+                        501, "Not Implemented");
+                    return -1;
             }
         }
 
@@ -277,70 +344,10 @@ int32_t http_send_default_response(const socket_fd_t socket_fd,
     return 0;
 }
 
-http_request_method_t http_get_request_method(
-    const http_request_headers_t* const request_headers
-) {
-    return request_headers->flags & (uint16_t)HTTP_METHOD_MASK;
-}
-
-void http_set_request_method(
-    http_request_headers_t* const request_headers,
-    const http_request_method_t request_method
-) {
-    request_headers->flags =
-        (request_headers->flags & (uint16_t)~HTTP_METHOD_MASK) |
-        (request_method & (uint16_t)HTTP_METHOD_MASK);
-}
-
-http_transfer_encoding_t http_get_transfer_encoding(
-    const http_request_headers_t* const request_headers
-) {
-    return request_headers->flags & (uint16_t)HTTP_TRANSFER_ENCODING_MASK;
-}
-
-void http_set_transfer_encoding(
-    http_request_headers_t* const request_headers,
-    const http_transfer_encoding_t transfer_encoding
-) {
-    request_headers->flags =
-        (request_headers->flags & (uint16_t)~HTTP_TRANSFER_ENCODING_MASK) |
-        (transfer_encoding & (uint16_t)HTTP_TRANSFER_ENCODING_MASK);
-}
-
-http_content_encoding_t http_get_content_encoding(
-    const http_request_headers_t* const request_headers
-) {
-    return request_headers->flags & (uint16_t)HTTP_CONTENT_ENCODING_MASK;
-}
-
-void http_set_content_encoding(
-    http_request_headers_t* const request_headers,
-    const http_content_encoding_t content_encoding
-) {
-    request_headers->flags =
-        (request_headers->flags & (uint16_t)~HTTP_CONTENT_ENCODING_MASK) |
-        (content_encoding & (uint16_t)HTTP_CONTENT_ENCODING_MASK);
-}
-
-http_expect_t http_get_expect(
-    const http_request_headers_t* const request_headers
-) {
-    return request_headers->flags & (uint16_t)HTTP_EXPECT_MASK;
-}
-
-void http_set_expect(
-    http_request_headers_t* request_headers,
-    http_expect_t expect
-) {
-    request_headers->flags =
-        (request_headers->flags & (uint16_t)~HTTP_EXPECT_MASK) |
-        (expect & HTTP_EXPECT_MASK);
-}
-
 http_connection_type_t http_get_connection_type(
     const http_request_headers_t* const request_headers
 ) {
-    return request_headers->flags & (uint16_t)HTTP_CONNECTION_MASK;
+    return request_headers->flags & (uint8_t)HTTP_CONNECTION_MASK;
 }
 
 void http_set_connection_type(
@@ -348,7 +355,7 @@ void http_set_connection_type(
     const http_connection_type_t connection_type
 ) {
     request_headers->flags =
-        (request_headers->flags & (uint16_t)~HTTP_CONNECTION_MASK) |
+        (request_headers->flags & (uint8_t)~HTTP_CONNECTION_MASK) |
         (connection_type & HTTP_CONNECTION_MASK);
 }
 
@@ -356,7 +363,7 @@ bool_t http_is_client_support_encoding(
     const http_request_headers_t* const request_headers,
     const http_accept_encoding_t accept_encoding
 ) {
-    return (request_headers->flags & (uint16_t)accept_encoding) != 0;
+    return (request_headers->flags & (uint8_t)accept_encoding) != 0;
 }
 
 void http_set_client_supported_encoding(
@@ -365,13 +372,13 @@ void http_set_client_supported_encoding(
     const bool_t value
 ) {
     if (value)
-        request_headers->flags |= (uint16_t)accept_encoding;
+        request_headers->flags |= (uint8_t)accept_encoding;
     else
-        request_headers->flags &= (uint16_t)~accept_encoding;
+        request_headers->flags &= (uint8_t)~accept_encoding;
 }
 
 void http_reset_client_supported_encoding(
     http_request_headers_t* const request_headers
 ) {
-    request_headers->flags &= (uint16_t)~HTTP_ACCEPT_ENCODING_MASK;
+    request_headers->flags &= (uint8_t)~HTTP_ACCEPT_ENCODING_MASK;
 }

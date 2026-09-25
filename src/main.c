@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -111,8 +112,8 @@ int32_t main(const int32_t argc, const char* const* const argv) {
                 if (server_receive_request(socket_fd, buffer,
                                            sizeof(connection->buffer),
                                            buffer_filled) != 0) {
-                    socket_close(socket_fd);
                     event_loop_remove_event(&event_loop, socket_fd);
+                    socket_close(socket_fd);
                     free(connection);
                     continue;
                 }
@@ -128,19 +129,23 @@ int32_t main(const int32_t argc, const char* const* const argv) {
                 int32_t buffer_size = *buffer_filled;
 
                 /* Try to handle the request */
-                if (*connection_state == HTTP_CONNECTION_READING_URI &&
-                    http_handle_request_uri(
+                if (*connection_state == HTTP_CONNECTION_READING_URI)
+                    switch (http_handle_request_uri(
                         request_headers, socket_fd, &buffer_ptr, &buffer_size
-                    ) == 0)
-                    ++*connection_state;
-                if (*connection_state == HTTP_CONNECTION_READING_HEADERS &&
-                    http_handle_request_headers(
-                        request_headers, socket_fd, &buffer_ptr, &buffer_size
-                    ) == 0)
-                    ++*connection_state;
-
-                http_send_default_response(socket_fd, buffer, *buffer_filled,
-                                           200, "Hello World!");
+                    )) {
+                        case 0:
+                            ++*connection_state;
+                            break;
+                        case 1:
+                            if (buffer != buffer_ptr) {
+                                memmove(buffer, buffer_ptr,
+                                        (uint64_t)buffer_size);
+                                *buffer_filled = buffer_size;
+                            }
+                            break;
+                        case -1:
+                            break;
+                    }
             }
         }
     }

@@ -2,6 +2,8 @@
 #include "error.h"
 #include "null.h"
 
+#include <errno.h>
+#include <string.h>
 #include <sys/epoll.h>
 #include <unistd.h>
 
@@ -43,7 +45,7 @@ int32_t event_loop_remove_event(const event_loop_t* const event_loop,
     /* Try to remove the event */
     if (epoll_ctl(event_loop->epoll_fd, EPOLL_CTL_DEL,
                   socket_fd, null) == -1) {
-        printerr("Failed to delete the epoll event");
+        printerr("Failed to delete the epoll event: %s", strerror(errno));
         return -1;
     }
 

@@ -25,6 +25,31 @@ int32_t util_hexval(unsigned char chr) {
     return -1;
 }
 
+bool_t util_strcicmp(const char* str1, const char* str2) {
+    /* Loop through strings */
+    while (*str1 != '\0' && *str2 != '\0') {
+        char c1 = *str1;
+        char c2 = *str2;
+
+        if (c1 != c2) {
+            /* Invert c1 case */
+            if (c1 >= 'A' && c1 <= 'Z')
+                c1 += 'a' - 'A';
+            else if (c1 >= 'a' && c1 <= 'z')
+                c1 -= 'a' - 'A';
+
+            /* Yet another check */
+            if (c1 != c2) return 0;
+        }
+
+        ++str1;
+        ++str2;
+    }
+
+    /* Return true */
+    return 1;
+}
+
 char* util_trim(char* str) {
     while (*str == ' ') ++str;
     return str;

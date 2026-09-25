@@ -231,7 +231,8 @@ int32_t ctrie_create(ctrie_t* const ctrie,
 
                     /* Save the data */
                     if (nodes_buffer_ptr->is_terminal)
-                        nodes_buffer_ptr->data = childs_ptr->sources->value;
+                        nodes_buffer_ptr->data =
+                            (childs_ptr->sources - 1)->value;
 
                     /* Add all the childs to the stack */
                     if (childs_ptr->childs_num > 0) {
@@ -347,7 +348,7 @@ static bool_t ctrie_are_equals(char** const str1, const char* str2,
     char* str1_ptr = *str1;
 
     /* Loop through strings */
-    while (str1_ptr[0] != eol && str1_ptr[0] != '\0' && str2[0] != '\0') {
+    while (*str1_ptr != eol && *str1_ptr != '\0' && *str2 != '\0') {
         char c1 = *str1_ptr;
         char c2 = *str2;
 
@@ -367,9 +368,7 @@ static bool_t ctrie_are_equals(char** const str1, const char* str2,
     }
 
     /* str2 should end with '\0' */
-    if (str2[0] != '\0') {
-        return 0;
-    }
+    if (*str2 != '\0') return 0;
 
     /* Update the original pointer */
     *str1 = str1_ptr;
